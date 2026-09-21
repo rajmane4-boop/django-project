@@ -39,8 +39,3 @@ python manage.py runserver
 ```
 Visit `http://127.0.0.1:8000/` in your browser.
 
----
-
-## 🤝 GitHub Collaboration Workflow
-
-Refer to [GIT_WORKFLOW.md](GIT_WORKFLOW.md) for the complete guide on branching, pull requests, and best practices.
