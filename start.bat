@@ -20,9 +20,19 @@ if not exist .venv\Scripts\python.exe (
         pause
         exit /b 1
     )
-    echo [*] Installing dependencies from requirements.txt...
-    call .venv\Scripts\activate.bat
-    pip install -r requirements.txt
+)
+
+:: Ensure pip and required dependencies are installed
+.venv\Scripts\python.exe -c "import django" >nul 2>nul
+if errorlevel 1 (
+    echo [*] Dependencies not found or incomplete. Installing from requirements.txt...
+    .venv\Scripts\python.exe -m pip install --upgrade pip
+    .venv\Scripts\python.exe -m pip install -r requirements.txt
+    if errorlevel 1 (
+        echo [ERROR] Failed to install dependencies.
+        pause
+        exit /b 1
+    )
 ) else (
     echo [OK] Python virtual environment ready.
 )

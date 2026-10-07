@@ -42,6 +42,13 @@ urlpatterns = [
     path('caregivers/<int:pk>/edit/', views.caregiver_update_view, name='caregiver_update'),
     path('caregivers/<int:pk>/delete/', views.caregiver_delete_view, name='caregiver_delete'),
 
+    # ── Caregiver Escalation & Live Portal (Phase 3) ──
+    path('caregiver/ack/<str:token>/', views.caregiver_ack_view, name='caregiver_ack'),
+    path('caregiver/portal/', views.caregiver_portal_view, name='caregiver_portal'),
+    path('caregiver/portal/access/<str:token>/', views.caregiver_portal_token_view, name='caregiver_portal_token'),
+    path('caregiver/portal/dose/<int:pk>/action/', views.caregiver_portal_action_view, name='caregiver_portal_action'),
+
     # ── Reports ───────────────────────────────
     path('reports/adherence/', views.adherence_report_view, name='adherence_report'),
 ]
+

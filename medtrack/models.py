@@ -110,6 +110,14 @@ class CaregiverContact(models.Model):
         (2, 'Tier 2 — Secondary'),
     ]
 
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='caregiver_contacts',
+        help_text='Optional registered user account for caregiver portal access',
+    )
     patient = models.ForeignKey(
         PatientProfile,
         on_delete=models.CASCADE,

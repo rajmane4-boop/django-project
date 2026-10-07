@@ -1,0 +1,245 @@
+{% extends "medtrack/base.html" %}
+{% load medtrack_tags %}
+
+{% block page_title %}Caregiver Live Portal{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- ── Portal Header Bar ── -->
+    <div class="glass-card rounded-2xl p-6 shadow-sm border border-slate-200/60 bg-white">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Live Telemetric Feed
+                    </span>
+                    <span class="text-xs text-slate-400">• Updated {{ now|date:"h:i A" }} UTC</span>
+                </div>
+                <h1 class="text-2xl font-bold tracking-tight text-slate-900 mt-1">
+                    Caregiver Safety Command Center
+                </h1>
+                <p class="text-xs text-slate-500 mt-0.5">
+                    Multi-patient clinical adherence monitoring and rapid-response intake verification
+                </p>
+            </div>
+
+            <!-- Caregiver Persona Switcher -->
+            <div class="flex items-center gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                    {{ current_caregiver.name.0|default:"C" }}
+                </div>
+                <div class="min-w-0">
+                    <p class="text-xs font-bold text-slate-900 truncate">
+                        {{ current_caregiver.name|default:"Primary Caregiver" }}
+                    </p>
+                    <p class="text-[11px] text-slate-500">
+                        {{ current_caregiver.get_relationship_display|default:"Caregiver" }} • Tier {{ current_caregiver.priority_tier|default:"1" }}
+                    </p>
+                </div>
+
+                {% if all_caregiver_options %}
+                <div class="ml-2 pl-2 border-l border-slate-200">
+                    <form method="GET" action="{% url 'medtrack:caregiver_portal' %}">
+                        <select name="caregiver_id" onchange="this.form.submit()"
+                                class="text-xs font-medium bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-700 focus:ring-1 focus:ring-brand-500">
+                            {% for opt in all_caregiver_options %}
+                            <option value="{{ opt.id }}" {% if current_caregiver.id == opt.id %}selected{% endif %}>
+                                {{ opt.name }} ({{ opt.relationship }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Global Safety Alert Banner (if any missed doses) ── -->
+    {% if global_alerts %}
+    <div class="p-5 rounded-2xl bg-rose-50 border-2 border-rose-200 shadow-sm space-y-3">
+        <div class="flex items-center gap-2.5 text-rose-800">
+            <span class="w-3 h-3 rounded-full bg-rose-600 animate-ping"></span>
+            <h3 class="text-sm font-bold tracking-tight uppercase">
+                Active Escalation Warnings ({{ global_alerts|length }} Overdue)
+            </h3>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {% for alert in global_alerts %}
+            <div class="p-3.5 rounded-xl bg-white border border-rose-200 shadow-xs flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-bold text-slate-800">
+                        {{ alert.patient.user.get_full_name|default:alert.patient.user.username }}
+                    </p>
+                    <p class="text-xs text-rose-700 font-semibold mt-0.5">
+                        {{ alert.dose.medication.name }} — Missed @ {{ alert.time_str }}
+                    </p>
+                    {% if alert.patient.emergency_phone %}
+                    <p class="text-[11px] text-slate-400 mt-1">
+                        Emergency: <a href="tel:{{ alert.patient.emergency_phone }}" class="text-brand-600 underline font-medium">{{ alert.patient.emergency_phone }}</a>
+                    </p>
+                    {% endif %}
+                </div>
+                <form hx-post="{% url 'medtrack:caregiver_portal_action' pk=alert.dose.pk %}"
+                      hx-target="closest .space-y-6"
+                      hx-swap="outerHTML">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="assist_taken">
+                    <input type="hidden" name="caregiver_name" value="{{ current_caregiver.name|default:'Caregiver' }}">
+                    <button type="submit"
+                            class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-all">
+                        Assist & Take
+                    </button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ── Monitored Patients Grid ── -->
+    {% if patient_monitors %}
+    <div class="space-y-6">
+        {% for monitor in patient_monitors %}
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+
+            <!-- Patient Header Ribbon -->
+            <div class="p-5 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="flex items-center gap-3.5">
+                    <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-base shadow-md">
+                        {{ monitor.user.first_name.0|default:monitor.user.username.0 }}
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-lg font-bold text-white tracking-tight">
+                                {{ monitor.user.get_full_name|default:monitor.user.username }}
+                            </h2>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-700 text-slate-300">
+                                {{ monitor.timezone }}
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-300 flex items-center gap-3 mt-0.5">
+                            {% if monitor.patient.primary_physician %}
+                            <span>Physician: <strong class="text-white">{{ monitor.patient.primary_physician }}</strong></span>
+                            {% endif %}
+                            {% if monitor.patient.emergency_phone %}
+                            <span>• Phone: <strong class="text-white">{{ monitor.patient.emergency_phone }}</strong></span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Adherence Metric Pill -->
+                <div class="flex items-center gap-3 bg-slate-800/80 px-4 py-2 rounded-xl border border-slate-700">
+                    <div class="text-right">
+                        <span class="text-[10px] uppercase font-semibold text-slate-400 block">Today's Adherence</span>
+                        <span class="text-lg font-extrabold {% if monitor.adherence_pct >= 80 %}text-emerald-400{% elif monitor.adherence_pct >= 50 %}text-amber-400{% else %}text-rose-400{% endif %}">
+                            {{ monitor.adherence_pct }}%
+                        </span>
+                    </div>
+                    <div class="w-10 h-10 rounded-full border-2 border-slate-700 flex items-center justify-center font-bold text-xs
+                                {% if monitor.adherence_pct >= 80 %}border-emerald-500 text-emerald-400{% else %}border-amber-500 text-amber-400{% endif %}">
+                        {{ monitor.taken_count }}/{{ monitor.total_doses }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Patient Telemetry & Schedule Details -->
+            <div class="p-6 space-y-6">
+
+                <!-- Quick Stats Strip -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div class="p-3 rounded-xl bg-slate-50 border border-slate-100 text-center">
+                        <span class="text-[11px] font-semibold text-slate-400 uppercase block">Total Scheduled</span>
+                        <span class="text-xl font-bold text-slate-800 block mt-0.5">{{ monitor.total_doses }}</span>
+                    </div>
+                    <div class="p-3 rounded-xl bg-emerald-50/70 border border-emerald-100 text-center">
+                        <span class="text-[11px] font-semibold text-emerald-700 uppercase block">Taken / Confirmed</span>
+                        <span class="text-xl font-bold text-emerald-700 block mt-0.5">{{ monitor.taken_count }}</span>
+                    </div>
+                    <div class="p-3 rounded-xl bg-amber-50/70 border border-amber-100 text-center">
+                        <span class="text-[11px] font-semibold text-amber-700 uppercase block">Pending Intake</span>
+                        <span class="text-xl font-bold text-amber-700 block mt-0.5">{{ monitor.pending_count }}</span>
+                    </div>
+                    <div class="p-3 rounded-xl bg-rose-50/70 border border-rose-100 text-center">
+                        <span class="text-[11px] font-semibold text-rose-700 uppercase block">Overdue / Missed</span>
+                        <span class="text-xl font-bold text-rose-700 block mt-0.5">{{ monitor.missed_count }}</span>
+                    </div>
+                </div>
+
+                <!-- Routine Anchor Times Reference -->
+                {% if monitor.routine %}
+                <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
+                    <span class="font-bold text-slate-700 uppercase text-[10px] tracking-wider">Routine Anchors:</span>
+                    <span>🥣 Breakfast: <strong class="text-slate-800">{{ monitor.routine.breakfast_time|time:"h:i A" }}</strong></span>
+                    <span>🥗 Lunch: <strong class="text-slate-800">{{ monitor.routine.lunch_time|time:"h:i A" }}</strong></span>
+                    <span>🍲 Dinner: <strong class="text-slate-800">{{ monitor.routine.dinner_time|time:"h:i A" }}</strong></span>
+                    <span>🌙 Bedtime: <strong class="text-slate-800">{{ monitor.routine.bedtime|time:"h:i A" }}</strong></span>
+                </div>
+                {% endif %}
+
+                <!-- Low Stock Inventory Warnings -->
+                {% if monitor.low_stock_meds %}
+                <div class="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
+                    <strong class="font-bold flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        Depletion Alert: Low Inventory
+                    </strong>
+                    <div class="flex flex-wrap gap-2 pt-1">
+                        {% for item in monitor.low_stock_meds %}
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white border border-amber-200 font-medium">
+                            {{ item.medication.name }}: {{ item.medication.current_stock }} units left (~{{ item.days_remaining }} days)
+                        </span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Today's Dose Schedule Timeline -->
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">
+                            Today's Dosing Protocol ({{ monitor.today|date:"M d, Y" }})
+                        </h3>
+                        <span class="text-xs text-slate-400">Click button to assist intake immediately</span>
+                    </div>
+
+                    {% if monitor.doses %}
+                    <div class="space-y-2">
+                        {% for event in monitor.doses %}
+                        {% include "medtrack/partials/portal_dose_row.html" with event=event patient_tz=monitor.timezone current_caregiver=current_caregiver %}
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-xs text-slate-400 py-3 text-center bg-slate-50 rounded-xl">
+                        No scheduled doses configured for this patient today.
+                    </p>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <!-- Empty State -->
+    <div class="bg-white rounded-2xl p-12 text-center border border-slate-200/80 shadow-sm max-w-lg mx-auto">
+        <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-3xl mx-auto mb-4">
+            🩺
+        </div>
+        <h3 class="text-base font-bold text-slate-800">No Monitored Patients Found</h3>
+        <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            You do not currently have any patients linked to your caregiver profile. Use the Caregivers menu in MedTrack to register contact links.
+        </p>
+        <a href="{% url 'medtrack:caregiver_list' %}"
+           class="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700 transition-colors">
+            Configure Caregiver Contacts
+        </a>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

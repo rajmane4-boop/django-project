@@ -1,0 +1,63 @@
+{% load medtrack_tags %}
+<div id="dose-row-{{ event.pk }}" class="flex items-center justify-between p-3.5 rounded-xl border border-slate-100 bg-white hover:bg-slate-50/80 transition-colors">
+    <div class="flex items-center gap-3 min-w-0">
+        <!-- Status indicator icon -->
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-sm font-bold
+                    {% if event.status == 'TAKEN' or event.status == 'TAKEN_LATE' %}bg-emerald-100 text-emerald-700
+                    {% elif event.status == 'MISSED' %}bg-rose-100 text-rose-700 animate-pulse
+                    {% elif event.status == 'SKIPPED' %}bg-slate-100 text-slate-600
+                    {% else %}bg-amber-100 text-amber-700{% endif %}">
+            {% if event.status == 'TAKEN' or event.status == 'TAKEN_LATE' %}✓
+            {% elif event.status == 'MISSED' %}⚠️
+            {% elif event.status == 'SKIPPED' %}⊘
+            {% else %}⏱{% endif %}
+        </div>
+        <div class="min-w-0">
+            <div class="flex items-center gap-2">
+                <h4 class="text-sm font-bold text-slate-800 truncate">{{ event.medication.name }}</h4>
+                <span class="text-xs text-slate-500 font-medium">({{ event.regimen.dose_quantity }} {{ event.medication.get_dosage_unit_display }})</span>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+                <span>{{ event.scheduled_time|to_patient_tz:patient_tz|date:"h:i A" }}</span>
+                <span>•</span>
+                <span>{{ event.regimen.get_anchor_display }}</span>
+                {% if event.taken_at %}
+                <span>•</span>
+                <span class="text-emerald-600 font-medium">Taken {{ event.taken_at|to_patient_tz:patient_tz|date:"h:i A" }}</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Side: Status Badge or Quick Actions -->
+    <div class="flex items-center gap-2">
+        {% if event.is_actionable or event.status == 'MISSED' %}
+        <form hx-post="{% url 'medtrack:caregiver_portal_action' pk=event.pk %}"
+              hx-target="#dose-row-{{ event.pk }}"
+              hx-swap="outerHTML"
+              class="flex items-center gap-1.5">
+            {% csrf_token %}
+            <input type="hidden" name="caregiver_name" value="{{ current_caregiver.name|default:'Caregiver' }}">
+            <button type="submit" name="action" value="assist_taken"
+                    class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-all flex items-center gap-1"
+                    title="Assist patient with taking dose now">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Assist & Take</span>
+            </button>
+            <button type="submit" name="action" value="skip"
+                    class="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                    title="Mark skipped">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </form>
+        {% else %}
+        <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold
+                    {% if event.status == 'TAKEN' or event.status == 'TAKEN_LATE' %}bg-emerald-50 text-emerald-700 border border-emerald-200
+                    {% elif event.status == 'MISSED' %}bg-rose-50 text-rose-700 border border-rose-200
+                    {% elif event.status == 'SKIPPED' %}bg-slate-100 text-slate-600 border border-slate-200
+                    {% else %}bg-amber-50 text-amber-700 border border-amber-200{% endif %}">
+            {{ event.get_status_display }}
+        </span>
+        {% endif %}
+    </div>
+</div>

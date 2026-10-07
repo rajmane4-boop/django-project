@@ -346,3 +346,130 @@ class EscalationEngineTests(MedTrackTestCase):
         self.assertIn('tier1_escalations', result)
         self.assertIn('tier2_escalations', result)
 
+
+class Phase3CaregiverEnhancementTests(MedTrackTestCase):
+    """
+    Tests for Phase 3 deliverables:
+      1. Frictionless Caregiver Acknowledgment Link (TimestampSigner, one-click response)
+      2. Multi-patient Caregiver Live Portal (Dashboard, HTMX quick-action)
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.caregiver = CaregiverContact.objects.create(
+            patient=self.profile,
+            name='Nurse Priya',
+            relationship='NURSE',
+            phone_number='+91 98765 33333',
+            email='priya.nurse@example.com',
+            priority_tier=1,
+        )
+        self.dose_event = DoseEvent.objects.create(
+            regimen=self.regimen,
+            medication=self.medication,
+            scheduled_time=timezone.now() - datetime.timedelta(minutes=45),
+            status='MISSED',
+            notes='[Escalation] Tier 1 alert fired.',
+        )
+
+    def test_ack_token_generation_and_verification(self):
+        from .services.acknowledgment import generate_ack_token, verify_ack_token
+
+        token = generate_ack_token(self.dose_event, self.caregiver)
+        self.assertIsInstance(token, str)
+
+        event, caregiver, err = verify_ack_token(token)
+        self.assertIsNone(err)
+        self.assertEqual(event.pk, self.dose_event.pk)
+        self.assertEqual(caregiver.pk, self.caregiver.pk)
+
+    def test_ack_token_tampered_or_expired(self):
+        import time
+        from .services.acknowledgment import generate_ack_token, verify_ack_token
+
+        # Tampered token
+        _, _, err = verify_ack_token('invalid-token-signature')
+        self.assertIn('Invalid or corrupted', err)
+
+        # Expired token with negative max_age
+        token = generate_ack_token(self.dose_event, self.caregiver)
+        time.sleep(0.01)
+        _, _, err_expired = verify_ack_token(token, max_age=-1)
+        self.assertIn('expired', err_expired)
+
+    def test_dispatch_caregiver_alert_includes_ack_urls(self):
+        from .services.notifications import dispatch_caregiver_alert
+
+        result = dispatch_caregiver_alert(self.dose_event, self.caregiver, tier=1)
+        self.assertTrue(result['dispatched'])
+        self.assertIn('ack_url', result)
+        self.assertIn('/caregiver/ack/', result['ack_url'])
+        self.assertIn('portal_url', result)
+        self.assertIn('/caregiver/portal/', result['portal_url'])
+
+    def test_caregiver_ack_view_renders_details(self):
+        from .services.acknowledgment import generate_ack_token
+        token = generate_ack_token(self.dose_event, self.caregiver)
+
+        # Caregiver does not need to log in
+        anon_client = Client()
+        response = anon_client.get(reverse('medtrack:caregiver_ack', args=[token]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Caregiver Safety Response')
+        self.assertContains(response, 'Nurse Priya')
+        self.assertContains(response, 'Metformin 500mg')
+        self.assertContains(response, 'Dose Assisted & Taken')
+
+    def test_caregiver_ack_action_assisted_taken_atomically_decrements_stock(self):
+        from .services.acknowledgment import generate_ack_token
+        token = generate_ack_token(self.dose_event, self.caregiver)
+        initial_stock = self.medication.current_stock
+
+        anon_client = Client()
+        response = anon_client.post(
+            reverse('medtrack:caregiver_ack', args=[token]),
+            {'action': 'assisted_taken'},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Dose marked as Assisted')
+
+        self.dose_event.refresh_from_db()
+        self.assertIn(self.dose_event.status, ('TAKEN', 'TAKEN_LATE'))
+        self.assertIn('Acknowledged & Assisted by Caregiver: Nurse Priya', self.dose_event.notes)
+
+        self.medication.refresh_from_db()
+        self.assertEqual(self.medication.current_stock, initial_stock - self.regimen.dose_quantity)
+
+    def test_caregiver_ack_action_false_alarm(self):
+        from .services.acknowledgment import generate_ack_token
+        token = generate_ack_token(self.dose_event, self.caregiver)
+
+        anon_client = Client()
+        response = anon_client.post(
+            reverse('medtrack:caregiver_ack', args=[token]),
+            {'action': 'false_alarm'},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Alert resolved as False Alarm')
+
+        self.dose_event.refresh_from_db()
+        self.assertIn('FALSE ALARM', self.dose_event.notes)
+
+    def test_caregiver_portal_view(self):
+        response = self.client.get(reverse('medtrack:caregiver_portal'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Caregiver Safety Command Center')
+        self.assertContains(response, 'John Doe')
+        self.assertContains(response, 'Metformin 500mg')
+
+    def test_caregiver_portal_action_endpoint(self):
+        response = self.client.post(
+            reverse('medtrack:caregiver_portal_action', args=[self.dose_event.pk]),
+            {'action': 'assist_taken', 'caregiver_name': 'Nurse Priya'},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.dose_event.refresh_from_db()
+        self.assertIn(self.dose_event.status, ('TAKEN', 'TAKEN_LATE'))
+        self.assertIn('Assisted & Taken via Caregiver Live Portal', self.dose_event.notes)
+
+
