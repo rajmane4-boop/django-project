@@ -45,7 +45,7 @@ from .services.inventory import (
     check_reorder_needed,
     record_dose_taken,
 )
-from .services.reports import render_pdf_or_html
+from .services.reports import render_pdf_or_html, render_requisition_pdf_or_html
 from .services.scheduling import generate_daily_dose_events
 
 
@@ -517,6 +517,41 @@ def adherence_report_view(request):
     response = HttpResponse(content, content_type=content_type)
     if as_pdf and content_type == 'application/pdf':
         response['Content-Disposition'] = f'attachment; filename="adherence_report_{profile.user.username}.pdf"'
+    return response
+
+
+@login_required
+def requisition_manifest_view(request):
+    """
+    Pharmacy Refill Requisition Manifest View (Phase 4).
+    Generates a dedicated purchase order/requisition document for medications.
+    Supports low-stock filtering or all active Rx, configurable supply coverage (14/30/60/90 days),
+    and print or PDF export.
+    """
+    profile = _get_patient_profile(request.user)
+
+    try:
+        refill_days = int(request.GET.get('days', 30))
+        if refill_days not in (14, 30, 60, 90):
+            refill_days = 30
+    except (ValueError, TypeError):
+        refill_days = 30
+
+    include_all = request.GET.get('all') in ('1', 'true', 'True')
+    as_pdf = request.GET.get('format') == 'pdf'
+
+    content, content_type = render_requisition_pdf_or_html(
+        profile,
+        refill_days=refill_days,
+        include_all=include_all,
+        as_pdf=as_pdf,
+    )
+
+    response = HttpResponse(content, content_type=content_type)
+    if as_pdf and content_type == 'application/pdf':
+        response['Content-Disposition'] = (
+            f'attachment; filename="pharmacy_requisition_{profile.user.username}_{refill_days}d.pdf"'
+        )
     return response
 
 

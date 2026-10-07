@@ -50,5 +50,6 @@ urlpatterns = [
 
     # ── Reports ───────────────────────────────
     path('reports/adherence/', views.adherence_report_view, name='adherence_report'),
+    path('reports/requisition/', views.requisition_manifest_view, name='requisition_manifest'),
 ]
 

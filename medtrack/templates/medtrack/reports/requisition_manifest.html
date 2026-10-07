@@ -1,0 +1,346 @@
+{% load medtrack_tags %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Refill Requisition Manifest — {{ user.get_full_name|default:user.username }}</title>
+    <!-- Tailwind Play CDN for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; color: black !important; padding: 0 !important; }
+            .page-break { page-break-before: always; }
+            table { page-break-inside: auto; }
+            tr { page-break-inside: avoid; page-break-after: auto; }
+            thead { display: table-header-group; }
+            .shadow-sm, .shadow-md, .shadow-lg { box-shadow: none !important; }
+            .border { border-color: #cbd5e1 !important; }
+            .bg-slate-50, .bg-slate-100 { background-color: #f8fafc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .bg-rose-50 { background-color: #fff1f2 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .bg-amber-50 { background-color: #fffbeb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased p-4 sm:p-8">
+
+    <!-- ── Interactive Screen Controls & Action Bar ── -->
+    <div class="no-print max-w-5xl mx-auto mb-6 flex flex-wrap items-center justify-between gap-4 bg-white px-6 py-4 rounded-2xl shadow-sm border border-slate-200">
+        <div class="flex items-center gap-3">
+            <a href="{% url 'medtrack:dashboard' %}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-teal-600 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                Dashboard
+            </a>
+            <span class="text-slate-300">|</span>
+            <a href="{% url 'medtrack:medication_list' %}" class="text-xs font-semibold text-slate-600 hover:text-teal-600 transition-colors">
+                Inventory
+            </a>
+        </div>
+
+        <!-- Filter & Duration Options -->
+        <div class="flex flex-wrap items-center gap-2">
+            <!-- Coverage Duration Toggle -->
+            <div class="inline-flex items-center rounded-xl bg-slate-100 p-1 text-xs font-semibold text-slate-600">
+                <span class="px-2 text-slate-400">Coverage:</span>
+                <a href="?days=14{% if include_all %}&all=1{% endif %}" class="px-2.5 py-1 rounded-lg {% if refill_days == 14 %}bg-white text-slate-900 shadow-xs{% else %}hover:text-slate-900{% endif %}">14d</a>
+                <a href="?days=30{% if include_all %}&all=1{% endif %}" class="px-2.5 py-1 rounded-lg {% if refill_days == 30 %}bg-white text-slate-900 shadow-xs{% else %}hover:text-slate-900{% endif %}">30d</a>
+                <a href="?days=60{% if include_all %}&all=1{% endif %}" class="px-2.5 py-1 rounded-lg {% if refill_days == 60 %}bg-white text-slate-900 shadow-xs{% else %}hover:text-slate-900{% endif %}">60d</a>
+                <a href="?days=90{% if include_all %}&all=1{% endif %}" class="px-2.5 py-1 rounded-lg {% if refill_days == 90 %}bg-white text-slate-900 shadow-xs{% else %}hover:text-slate-900{% endif %}">90d</a>
+            </div>
+
+            <!-- All vs Low Stock Toggle -->
+            <a href="?days={{ refill_days }}{% if not include_all %}&all=1{% endif %}"
+               class="px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors
+                      {% if include_all %}bg-slate-900 text-white border-slate-900{% else %}bg-white text-slate-700 border-slate-300 hover:bg-slate-50{% endif %}">
+                {% if include_all %}Showing: All Active Rx{% else %}Showing: Low Stock Only{% endif %}
+            </a>
+
+            <!-- PDF Download -->
+            <a href="?days={{ refill_days }}{% if include_all %}&all=1{% endif %}&format=pdf"
+               class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors">
+                <svg class="w-3.5 h-3.5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Download PDF
+            </a>
+
+            <!-- Print Button -->
+            <button onclick="window.print()" class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs shadow-sm transition-all">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                Print / Save PDF
+            </button>
+        </div>
+    </div>
+
+    <!-- ── Clinical Requisition Manifest Document ── -->
+    <main class="max-w-5xl mx-auto bg-white rounded-2xl shadow-md border border-slate-200 p-8 sm:p-12 space-y-8">
+
+        <!-- 1. Document Header & Routing Bar -->
+        <header class="border-b-2 border-slate-900 pb-6">
+            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div>
+                    <div class="flex items-center gap-2 text-teal-700 font-bold text-lg tracking-tight">
+                        <span class="text-2xl">📋</span> SMART MEDTRACK CLINICAL PHARMACY SERVICES
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-black text-slate-900 mt-1 uppercase tracking-tight">
+                        Medication Refill Requisition Manifest
+                    </h1>
+                    <p class="text-xs text-slate-500 uppercase tracking-widest mt-0.5">
+                        Purchase Order & Depletion Forecasting Document • Authorized Pharmacy Copy
+                    </p>
+                </div>
+                <div class="text-left sm:text-right text-xs text-slate-600 space-y-1 sm:min-w-[200px]">
+                    <div class="inline-block px-3 py-1 rounded bg-slate-900 text-white font-mono font-bold text-xs tracking-wider">
+                        {{ manifest_id }}
+                    </div>
+                    <p><span class="font-semibold text-slate-800">Issue Date:</span> {{ generated_at|date:"M d, Y" }}</p>
+                    <p><span class="font-semibold text-slate-800">Target Coverage:</span> {{ refill_days }} Days Supply</p>
+                    <p class="font-mono text-[10px] text-slate-400">TIMEZONE: {{ patient.timezone }}</p>
+                </div>
+            </div>
+
+            {% if total_critical > 0 %}
+            <div class="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 flex items-center justify-between text-xs">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-rose-600 animate-ping"></span>
+                    <strong class="font-bold uppercase tracking-wider">Critical Depletion Notice:</strong>
+                    <span>{{ total_critical }} medication(s) currently exceed procurement lead-time safety window. Prioritize urgent dispense.</span>
+                </div>
+                <span class="font-mono font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded text-[11px]">PRIORITY 1</span>
+            </div>
+            {% endif %}
+        </header>
+
+        <!-- 2. Patient Identity & Prescriber Demographics -->
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-4 p-5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+            <div>
+                <p class="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Patient Profile (Subject)</p>
+                <p class="text-base font-bold text-slate-900 mt-1">{{ user.get_full_name|default:user.username }}</p>
+                <p class="text-slate-600 mt-0.5 font-mono">Patient ID: #PAT-{{ patient.pk|stringformat:"04d" }}</p>
+                <p class="text-slate-600">Email: {{ user.email|default:"N/A" }}</p>
+                <p class="text-slate-600">Emergency Phone: <strong class="text-slate-800">{{ patient.emergency_phone|default:"Not specified" }}</strong></p>
+            </div>
+
+            <div>
+                <p class="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Physician Supervision</p>
+                <p class="text-base font-bold text-slate-900 mt-1">{{ patient.primary_physician|default:"Attending Physician on Record" }}</p>
+                <p class="text-slate-600 mt-0.5">Clinical Protocol: Chronic Disease Adherence</p>
+                <p class="text-slate-600">Escalation Priority Contacts: {{ patient.caregivers.count }} Verified</p>
+                <p class="text-slate-600">Patient Timezone Anchor: {{ patient.timezone }}</p>
+            </div>
+
+            <div>
+                <p class="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Requisition Logistics</p>
+                <p class="text-xs font-semibold text-slate-800 mt-1">Dispensing Routing: Retail / Mail-Order Rx</p>
+                <p class="text-slate-600 mt-0.5">Replenishment Horizon: {{ refill_days }} Days Supply</p>
+                <p class="text-slate-600">Lead-Time Buffer: Standard 3-Day Procurement Buffer</p>
+                <p class="text-slate-600">Transmission Mode: Clinical Drop-off / Fax / Telemetric Push</p>
+            </div>
+        </section>
+
+        <!-- 3. Primary Purchase Order Requisition Manifest Table -->
+        <section class="space-y-3">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-base font-bold text-slate-900 uppercase tracking-wide">
+                        Prescription Depletion & Replenishment Manifest
+                    </h2>
+                    <p class="text-xs text-slate-500">
+                        Units computed from rolling 7-day burn rate Σ(daily intake) and pharmacy lead-time thresholds
+                    </p>
+                </div>
+                <span class="text-xs font-semibold text-slate-600">
+                    {{ item_count }} Item{% if item_count != 1 %}s{% endif %} Listed
+                </span>
+            </div>
+
+            {% if items %}
+            <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-900 text-white uppercase text-[10px] tracking-wider font-semibold">
+                        <tr>
+                            <th class="py-3 px-3 w-10 text-center">#</th>
+                            <th class="py-3 px-4">Medication & Chemical Generic</th>
+                            <th class="py-3 px-3 text-center">Dosage Unit</th>
+                            <th class="py-3 px-3 text-right">In Stock</th>
+                            <th class="py-3 px-3 text-right">7-Day Burn Rate</th>
+                            <th class="py-3 px-3 text-center">Days Left</th>
+                            <th class="py-3 px-3 text-center">Est. Runout</th>
+                            <th class="py-3 px-3 text-center">Lead Buffer</th>
+                            <th class="py-3 px-4 text-right bg-teal-900 text-teal-100 font-bold">Suggested Refill</th>
+                            <th class="py-3 px-3 text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200">
+                        {% for item in items %}
+                        <tr class="{% if item.urgency == 'CRITICAL' %}bg-rose-50/60{% elif item.urgency == 'URGENT' %}bg-amber-50/40{% else %}hover:bg-slate-50{% endif %} transition-colors">
+                            <td class="py-3.5 px-3 text-center font-mono text-slate-400 font-medium">
+                                {{ forloop.counter }}
+                            </td>
+                            <td class="py-3.5 px-4">
+                                <span class="font-bold text-slate-900 block text-sm">{{ item.name }}</span>
+                                <span class="text-[11px] text-slate-500 block italic font-mono">{{ item.generic_name }}</span>
+                                {% if item.regimen_summaries %}
+                                <div class="text-[10px] text-slate-400 mt-1 space-y-0.5">
+                                    {% for r in item.regimen_summaries %}
+                                    <span class="inline-block mr-2">• {{ r }}</span>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                                {% if item.notes %}
+                                <span class="text-[10px] text-slate-500 block mt-0.5 font-sans">Rx Note: {{ item.notes }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3.5 px-3 text-center text-slate-700 font-medium">
+                                {{ item.unit }}
+                            </td>
+                            <td class="py-3.5 px-3 text-right font-mono font-bold {% if item.current_stock <= 5 %}text-rose-600{% else %}text-slate-800{% endif %}">
+                                {{ item.current_stock }}
+                            </td>
+                            <td class="py-3.5 px-3 text-right font-mono text-slate-600">
+                                {{ item.burn_rate }}/day
+                            </td>
+                            <td class="py-3.5 px-3 text-center font-mono font-bold
+                                       {% if item.days_remaining <= item.lead_time_days %}text-rose-700
+                                       {% elif item.days_remaining <= item.total_lead_buffer %}text-amber-700
+                                       {% else %}text-emerald-700{% endif %}">
+                                {% if item.days_remaining is not None %}
+                                {{ item.days_remaining }}d
+                                {% else %}
+                                &infin;
+                                {% endif %}
+                            </td>
+                            <td class="py-3.5 px-3 text-center text-[11px] text-slate-600 whitespace-nowrap">
+                                {% if item.stockout_date %}
+                                {{ item.stockout_date|date:"M d, Y" }}
+                                {% else %}
+                                —
+                                {% endif %}
+                            </td>
+                            <td class="py-3.5 px-3 text-center text-[11px] text-slate-500 whitespace-nowrap">
+                                {{ item.lead_time_days }}d + {{ item.safety_buffer_days }}d = <strong>{{ item.total_lead_buffer }}d</strong>
+                            </td>
+                            <td class="py-3.5 px-4 text-right bg-teal-50/70 border-l border-r border-teal-100 font-mono font-extrabold text-teal-900 text-sm">
+                                +{{ item.suggested_refill_quantity }} {{ item.unit }}
+                            </td>
+                            <td class="py-3.5 px-3 text-center whitespace-nowrap">
+                                {% if item.urgency == 'CRITICAL' %}
+                                <span class="px-2 py-1 rounded text-[10px] font-bold uppercase bg-rose-100 text-rose-800 border border-rose-300">
+                                    Critical
+                                </span>
+                                {% elif item.urgency == 'URGENT' %}
+                                <span class="px-2 py-1 rounded text-[10px] font-bold uppercase bg-amber-100 text-amber-800 border border-amber-300">
+                                    Reorder
+                                </span>
+                                {% else %}
+                                <span class="px-2 py-1 rounded text-[10px] font-semibold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                    Routine
+                                </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% else %}
+            <!-- All Stocks Adequate Notice -->
+            <div class="p-8 rounded-xl bg-slate-50 border border-slate-200 text-center space-y-2">
+                <div class="text-3xl">✅</div>
+                <h3 class="font-bold text-slate-800 text-sm">No Immediate Refills Required</h3>
+                <p class="text-xs text-slate-500 max-w-md mx-auto">
+                    All current active medication stocks exceed the required procurement lead time and safety buffer thresholds.
+                </p>
+                <div class="pt-2">
+                    <a href="?days={{ refill_days }}&all=1"
+                       class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors">
+                        View Full Active Inventory Manifest
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </section>
+
+        <!-- 4. Dispensing Pharmacy Verification & Stamp Block -->
+        <section class="border border-slate-300 rounded-xl p-6 bg-slate-50/50 space-y-4">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Pharmacy Dispensing & Reconciliation Verification (To be completed by Pharmacist)
+            </h3>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                <div class="border border-slate-200 rounded-lg p-3 bg-white space-y-2">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase block">Dispensing Pharmacy</span>
+                    <div class="h-6 border-b border-dashed border-slate-300"></div>
+                    <span class="text-[10px] text-slate-400 block">Pharmacy Name / License No.</span>
+                </div>
+
+                <div class="border border-slate-200 rounded-lg p-3 bg-white space-y-2">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase block">Batch & Lot Tracking</span>
+                    <div class="h-6 border-b border-dashed border-slate-300"></div>
+                    <span class="text-[10px] text-slate-400 block">Lot # / NDC / Expiration Date</span>
+                </div>
+
+                <div class="border border-slate-200 rounded-lg p-3 bg-white space-y-2">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase block">Dispensed Units Verified</span>
+                    <div class="h-6 border-b border-dashed border-slate-300"></div>
+                    <span class="text-[10px] text-slate-400 block">Dispensed Quantity Confirmed</span>
+                </div>
+            </div>
+
+            <!-- Pharmacy Stamp Box -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div class="p-4 rounded-lg border border-dashed border-slate-300 bg-white min-h-[90px] flex flex-col justify-between">
+                    <span class="text-[10px] uppercase font-bold text-slate-400">Dispensing Pharmacist Signature</span>
+                    <div class="border-b border-slate-400 mt-8"></div>
+                    <span class="text-[10px] text-slate-400 mt-1">Signature & R.Ph / PharmD License Number</span>
+                </div>
+
+                <div class="p-4 rounded-lg border border-dashed border-slate-300 bg-white min-h-[90px] flex flex-col justify-between">
+                    <span class="text-[10px] uppercase font-bold text-slate-400">Official Pharmacy Seal / Stamp</span>
+                    <div class="text-center text-[10px] text-slate-300 my-auto uppercase tracking-widest font-mono">
+                        [ Official Pharmacy Stamp Here ]
+                    </div>
+                    <span class="text-[10px] text-slate-400 mt-1">Date of Dispensing Verification</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. Attestation & Prescriber Sign-Off -->
+        <footer class="border-t border-slate-200 pt-6 space-y-6">
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 leading-relaxed space-y-2">
+                <strong class="font-bold text-slate-800 block uppercase tracking-wider text-[10px]">
+                    Prescription Authorization & Clinical Compliance Statement
+                </strong>
+                <p>
+                    I hereby attest that the items enumerated in this requisition manifest correspond to authorized, ongoing treatment regimens for the patient identified above. Quantity determinations reflect empirical 7-day burn-rate telemetry recorded in Smart MedTrack to ensure zero therapy interruptions. Dispensation should proceed according to established generic substitution protocols unless specified.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-8 text-xs pt-4">
+                <div>
+                    <div class="border-b-2 border-slate-800 pb-1"></div>
+                    <p class="font-bold text-slate-900 mt-1">{{ patient.primary_physician|default:"Attending Physician" }}</p>
+                    <p class="text-slate-500 text-[11px]">Authorized Prescriber / Clinical Supervisor</p>
+                    <p class="text-slate-400 text-[10px] font-mono mt-0.5">NPI / Medical Council ID: _____________________</p>
+                </div>
+                <div>
+                    <div class="border-b-2 border-slate-800 pb-1"></div>
+                    <p class="font-bold text-slate-900 mt-1">{{ generated_at|date:"F d, Y" }}</p>
+                    <p class="text-slate-500 text-[11px]">Date of Certification & Electronic Validation</p>
+                    <p class="text-slate-400 text-[10px] font-mono mt-0.5">DOC HASH: SHA256-{{ manifest_id }}</p>
+                </div>
+            </div>
+        </footer>
+
+    </main>
+
+</body>
+</html>

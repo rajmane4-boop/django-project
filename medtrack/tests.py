@@ -473,3 +473,77 @@ class Phase3CaregiverEnhancementTests(MedTrackTestCase):
         self.assertIn('Assisted & Taken via Caregiver Live Portal', self.dose_event.notes)
 
 
+class Phase4RequisitionManifestTests(MedTrackTestCase):
+    """
+    Tests for Phase 4 Pharmacy Refill Requisition Manifest:
+      • Rolling burn-rate depletion forecasting & lead-time safety buffers
+      • Suggested replenishment unit calculation
+      • Document view rendering, duration filtering, and PDF fallback
+    """
+
+    def test_requisition_manifest_data_calculation_and_filtering(self):
+        from .services.reports import generate_requisition_manifest_data
+
+        # Initially stock is 60, days remaining is 60 -> not low stock
+        data_default = generate_requisition_manifest_data(self.profile, refill_days=30, include_all=False)
+        self.assertEqual(data_default['item_count'], 0)
+
+        # Include all flag should show active medication even with healthy stock
+        data_all = generate_requisition_manifest_data(self.profile, refill_days=30, include_all=True)
+        self.assertEqual(data_all['item_count'], 1)
+        item = data_all['items'][0]
+        self.assertEqual(item['name'], 'Metformin 500mg')
+        self.assertEqual(item['burn_rate'], 1.0)
+        self.assertEqual(item['lead_time_days'], 3)
+        self.assertEqual(item['safety_buffer_days'], 3)
+        self.assertEqual(item['total_lead_buffer'], 6)
+
+        # Drop stock to 4 (below threshold 3+3=6) to trigger urgent reorder
+        self.medication.current_stock = 4
+        self.medication.save()
+
+        data_reorder = generate_requisition_manifest_data(self.profile, refill_days=30, include_all=False)
+        self.assertEqual(data_reorder['item_count'], 1)
+        reorder_item = data_reorder['items'][0]
+        self.assertTrue(reorder_item['needs_reorder'])
+        self.assertIn(reorder_item['urgency'], ('CRITICAL', 'URGENT'))
+        # Coverage for 30 days + 6 lead buffer = 36 units target; deficit = 36 - 4 = 32 units
+        self.assertEqual(reorder_item['suggested_refill_quantity'], 32)
+        self.assertIsNotNone(reorder_item['stockout_date'])
+
+    def test_requisition_manifest_view_renders_manifest(self):
+        # Trigger low stock
+        self.medication.current_stock = 3
+        self.medication.save()
+
+        response = self.client.get(reverse('medtrack:requisition_manifest'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Medication Refill Requisition Manifest')
+        self.assertContains(response, 'Metformin 500mg')
+        self.assertContains(response, 'John Doe')
+        self.assertContains(response, 'Suggested Refill')
+        self.assertContains(response, 'Pharmacy Dispensing & Reconciliation Verification')
+        self.assertContains(response, 'Prescription Authorization & Clinical Compliance Statement')
+
+    def test_requisition_manifest_view_duration_toggles(self):
+        self.medication.current_stock = 3
+        self.medication.save()
+
+        # 60 days
+        resp_60 = self.client.get(reverse('medtrack:requisition_manifest') + '?days=60')
+        self.assertEqual(resp_60.status_code, 200)
+        self.assertContains(resp_60, '60 Days Supply')
+
+        # 90 days with all medications
+        resp_90 = self.client.get(reverse('medtrack:requisition_manifest') + '?days=90&all=1')
+        self.assertEqual(resp_90.status_code, 200)
+        self.assertContains(resp_90, '90 Days Supply')
+
+    def test_requisition_manifest_pdf_format_parameter(self):
+        response = self.client.get(reverse('medtrack:requisition_manifest') + '?format=pdf')
+        self.assertEqual(response.status_code, 200)
+        # Content type will be application/pdf if weasyprint installed, or text/html fallback
+        self.assertIn(response['Content-Type'], ('application/pdf', 'text/html; charset=utf-8', 'text/html'))
+
+
+
