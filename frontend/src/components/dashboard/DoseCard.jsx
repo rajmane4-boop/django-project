@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, X, Clock, Pill, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Check, X, Clock, Pill, AlertTriangle, ShieldAlert, Utensils, Droplets } from 'lucide-react';
 import StatusBadge from '../ui/StatusBadge';
 
 export default function DoseCard({ dose, onTake, onSkip }) {
@@ -88,6 +88,12 @@ export default function DoseCard({ dose, onTake, onSkip }) {
           </div>
 
           {/* Special Instructions or Taken Timestamp */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+              <Droplets className="w-3 h-3" />
+              Full glass of water
+            </span>
+          </div>
           {dose.instructions && (
             <p className="text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 rounded-lg inline-block">
               <span className="font-semibold">Instructions:</span> {dose.instructions}
