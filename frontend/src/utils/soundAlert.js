@@ -77,3 +77,4 @@ export function playUrgentEscalationChime(tier = 'TIER_1') {
     console.warn('Audio playback not permitted or unsupported:', err);
   }
 }
+

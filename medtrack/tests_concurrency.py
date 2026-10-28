@@ -164,3 +164,4 @@ class ConcurrencyStressTestCase(TransactionTestCase):
         self.medication.refresh_from_db()
         self.assertEqual(res.status, 'TAKEN')
         self.assertEqual(self.medication.current_stock, original_stock)
+

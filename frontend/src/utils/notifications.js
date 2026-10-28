@@ -50,3 +50,4 @@ export function sendBrowserNotification(title, options = {}) {
     return null;
   }
 }
+
