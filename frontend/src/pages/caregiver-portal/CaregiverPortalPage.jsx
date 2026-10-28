@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ShieldAlert,
   User,
@@ -14,10 +14,20 @@ import {
   TrendingUp,
   BarChart2,
   Activity,
+  Volume2,
+  VolumeX,
+  Bell,
 } from 'lucide-react';
 import { api } from '../../api/client';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Toast from '../../components/ui/Toast';
+import { playUrgentEscalationChime } from '../../utils/soundAlert';
+import {
+  requestNotificationPermission,
+  sendBrowserNotification,
+  getNotificationPermission,
+} from '../../utils/notifications';
+
 
 export default function CaregiverPortalPage() {
   const [data, setData] = useState(null);
@@ -25,6 +35,36 @@ export default function CaregiverPortalPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
   const [toast, setToast] = useState(null);
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    return localStorage.getItem('caregiver_sound_alerts') !== 'false';
+  });
+  const [notifPerm, setNotifPerm] = useState(getNotificationPermission());
+  const prevAlertCountRef = useRef(0);
+
+  const toggleSound = () => {
+    const nextVal = !soundEnabled;
+    setSoundEnabled(nextVal);
+    localStorage.setItem('caregiver_sound_alerts', String(nextVal));
+    if (nextVal) {
+      playUrgentEscalationChime('TIER_1');
+      setToast({ message: 'Sound alerts enabled. Test chime played.', type: 'info' });
+    } else {
+      setToast({ message: 'Sound alerts muted.', type: 'info' });
+    }
+  };
+
+  const handleEnableNotifications = async () => {
+    const res = await requestNotificationPermission();
+    setNotifPerm(res);
+    if (res === 'granted') {
+      sendBrowserNotification('Smart MedTrack Caregiver Watchdog', {
+        body: 'Desktop escalation notifications are now enabled.',
+      });
+      setToast({ message: 'Browser notifications enabled successfully.', type: 'success' });
+    } else if (res === 'denied') {
+      setToast({ message: 'Notifications were blocked in your browser settings.', type: 'error' });
+    }
+  };
 
   const fetchPortal = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -32,6 +72,24 @@ export default function CaregiverPortalPage() {
     try {
       const res = await api.getCaregiverPortal();
       setData(res);
+
+      const currentAlerts = res?.urgent_alerts || [];
+      if (currentAlerts.length > 0 && currentAlerts.length > prevAlertCountRef.current) {
+        const hasTier2 = currentAlerts.some((a) => a.tier2_escalated);
+        if (soundEnabled) {
+          playUrgentEscalationChime(hasTier2 ? 'TIER_2' : 'TIER_1');
+        }
+        if (notifPerm === 'granted') {
+          sendBrowserNotification(
+            hasTier2 ? '🚨 CRITICAL: Tier 2 Escalation Breach' : '⚠️ MedTrack Caregiver Dose Alert',
+            {
+              body: `${currentAlerts.length} overdue dose(s) require intervention.`,
+              requireInteraction: hasTier2,
+            }
+          );
+        }
+      }
+      prevAlertCountRef.current = currentAlerts.length;
     } catch (err) {
       setToast({ message: 'Error loading caregiver portal: ' + err.message, type: 'error' });
     } finally {
@@ -105,14 +163,40 @@ export default function CaregiverPortalPage() {
           </div>
         </div>
 
-        <button
-          onClick={() => fetchPortal(true)}
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={toggleSound}
+            title={soundEnabled ? 'Mute sound alerts' : 'Enable sound alerts'}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
+              soundEnabled
+                ? 'border-teal-200 dark:border-teal-900 bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300'
+                : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-500'
+            }`}
+          >
+            {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-teal-600" /> : <VolumeX className="w-3.5 h-3.5" />}
+            <span>{soundEnabled ? 'Chimes On' : 'Muted'}</span>
+          </button>
+
+          {notifPerm !== 'granted' && (
+            <button
+              onClick={handleEnableNotifications}
+              title="Enable desktop notifications"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 text-xs font-semibold transition-all hover:bg-amber-100 dark:hover:bg-amber-900/60"
+            >
+              <Bell className="w-3.5 h-3.5" />
+              <span>Enable Push</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => fetchPortal(true)}
           disabled={refreshing}
           className="flex items-center gap-2 self-start sm:self-auto px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 transition-all shadow-xs"
         >
           <RotateCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
           {refreshing ? 'Refreshing...' : 'Live Refresh'}
-        </button>
+          </button>
+        </div>
       </div>
 
       {/* Urgent Watchdog Alerts */}
