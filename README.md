@@ -1,30 +1,53 @@
 # 💊 Smart MedTrack
 
-**Automated Medication Adherence & Inventory Forecasting System**  
-*A clinical telemetric and safety management platform built on Django 5+, Celery, Redis, HTMX, and Tailwind CSS.*
+**Automated Medication Adherence & Rolling Inventory Forecasting System**  
+*A clinical telemetric and safety management platform built on Django 5+, React 19, Vite 6, Celery, Redis, and Tailwind CSS.*
 
 ---
 
 ## 🌟 Executive Summary & Key Highlights
 
-Smart MedTrack solves three fundamental flaws of conventional alarm apps and plastic pillboxes:
-1. **Biological Routine Anchoring**: Dosing schedules align with human meal routines (`Breakfast`, `Lunch`, `Dinner`, `Bedtime` with offsets like *-15 min before breakfast*) rather than arbitrary clock alarms.
-2. **Two-Tier Fail-Safe Escalation**: Unconfirmed doses trigger an automated escalation chain. If a dose is unconfirmed 30 minutes past its scheduled time, Tier 1 primary caregivers receive an urgent alert. If unacknowledged within 60 minutes, secondary Tier 2 emergency contacts are escalated.
+Smart MedTrack solves three fundamental defects of conventional alarm apps and plastic pillboxes:
+1. **Biological Routine Anchoring**: Dosing schedules align dynamically with human routine events (`Breakfast`, `Lunch`, `Dinner`, `Bedtime` with offsets like *-15 min before breakfast*) rather than arbitrary clock alarms.
+2. **Two-Tier Fail-Safe Escalation**: Unconfirmed doses trigger an automated escalation chain. If a dose is unconfirmed 30 minutes past its scheduled time, Tier 1 primary caregivers receive an urgent alert with a cryptographic, expiring frictionless action link. If unacknowledged within 60 minutes, secondary Tier 2 emergency contacts are escalated.
 3. **Atomic Inventory & Depletion Forecasting**: Medication stock decrements concurrently and safely using database row locking (`select_for_update` + `transaction.atomic`). Rolling 7-day burn rates calculate exact stockout dates and trigger proactive replenishment alerts.
-4. **Clinical Adherence Reports**: Generates verifiable, print-ready and PDF-exportable adherence scorecards with physician attestation blocks.
+4. **Caregiver Live Watchdog & Safety Portal**: Multi-patient monitoring interface equipped with real-time SVG adherence comparison charts, synthetic Web Audio API urgency chimes, and native browser push notifications.
+5. **Electronic Requisition & Clinical Audit Exports**: Generates print-ready clinical compliance scorecards and pharmacy purchase order manifests with one-click **CSV** and **JSON** exports for Electronic Data Interchange (EDI) and EHR systems.
+6. **Progressive Web App (PWA) Offline Resilience**: Equipped with Service Worker caching and live network connectivity status detection, ensuring patients can review regimens even during intermittent internet outages.
 
 ---
 
 ## 🏗️ Architecture & Tech Stack
 
-| Component | Technology | Role |
+```
+                          [ Client Browser / PWA ]
+                     (React 19 + Vite 6 + Tailwind CSS)
+                                    │
+                       (Async Fetch /api/* + CSRF)
+                                    ▼
+                      [ Django 5 Application Core ]
+                     /              │              \
+          (Auth & ORM)        (Transaction)     (Reports & EDI)
+                   /                │                \
+                  ▼                 ▼                 ▼
+          [ PostgreSQL 16 ]    [ Redis Broker ]   [ CSV / JSON / PDF ]
+          (or SQLite engine)        │
+                                    ▼
+                         [ Celery Workers & Beat ]
+                          ├── Daily Localized Day Generator
+                          ├── 10-Min Escalation Watchdog
+                          └── Outbound Notification Dispatcher
+```
+
+| Layer | Technology | Role |
 |---|---|---|
-| **Backend & ORM** | Python 3.13 / Django 6.1 | Core MVC, business logic, authentication, ORM |
-| **Database** | PostgreSQL 16 (or SQLite fallback) | ACID relational storage, row-level locks, constraints |
-| **Async Task Queue** | Celery 5.4 + Redis 8 | Periodic missed dose scanner, multi-channel alerts |
-| **Dynamic Frontend** | Django Templates + HTMX 2.0 | Reactive partial swaps (instant dose check-offs) without SPA bloat |
-| **Styling & UI** | Tailwind CSS + Google Inter | Glassmorphic clinical dashboard, status tags, responsive sidebar |
-| **Reporting & Export** | HTML5 Print CSS / WeasyPrint | A4 clinical compliance scorecards with physician sign-off |
+| **Frontend Application** | React 19, Vite 6, Tailwind CSS 3 | Modern SPA shell, interactive dashboard, SVG sparklines, glassmorphic UI |
+| **PWA & Audio Alert Subsystem** | Service Worker, Web Audio API, Push API | Offline shell caching, synthetic dual-frequency chimes, desktop alerts |
+| **Backend Core & ORM** | Python 3.12+ / Django 5/6 | Authentication, transaction orchestration, models, admin interface |
+| **RESTful API Bridge** | Django REST View Layer (`/api/*`) | Centralized JSON API with zero-dependency CORS & CSRF token sync |
+| **Database** | PostgreSQL 16+ (or SQLite engine) | ACID relational storage, row-level locks (`select_for_update`), constraints |
+| **Task Queue & Broker** | Celery 5.4+ with Redis 7+ | Periodic escalation watchdog sweeps and async notification dispatch |
+| **Audit & Requisition** | Python CSV, JSON, HTML5 Print Engine | Clinical compliance scorecards and pharmacy purchase orders |
 
 ---
 
@@ -32,38 +55,54 @@ Smart MedTrack solves three fundamental flaws of conventional alarm apps and pla
 
 ```
 django-project/
-├── core/                       # Project configuration
-│   ├── settings.py             # Settings (Environ, Celery, DB, Static)
-│   ├── urls.py                 # Master URL routing
-│   ├── celery.py               # Celery application setup
-│   └── wsgi.py / asgi.py
-├── medtrack/                   # Main application
-│   ├── models.py               # 6 Core models (PatientProfile, Routine, Medication, Regimen, DoseEvent, Caregiver)
-│   ├── views.py                # Auth, Dashboard, CRUD views, Clinical Reports
-│   ├── urls.py                 # App route mappings
-│   ├── forms.py                # Tailwind-styled forms with dynamic weekday selectors
-│   ├── admin.py                # Customized Django admin interface
-│   ├── tests.py                # Comprehensive 14-test unit & integration test suite
-│   ├── tasks.py                # Celery periodic and async background tasks
-│   ├── services/
-│   │   ├── scheduling.py       # Anchor-offset time calculation & daily dose event generation
-│   │   ├── inventory.py        # Atomic stock decrement, 7-day burn rate, stockout calculation
-│   │   ├── escalation.py       # 30m Tier 1 & 60m Tier 2 missed-dose state machine
-│   │   ├── notifications.py    # Multi-channel caregiver alert dispatcher (SMS / Email)
-│   │   └── reports.py          # Clinical adherence data compilation & PDF rendering
-│   ├── templatetags/
-│   │   └── medtrack_tags.py    # Timezone conversion, status colors, and stock gauges
-│   └── templates/medtrack/
-│       ├── base.html           # Responsive layout with modern glassmorphism & sidebar
-│       ├── dashboard.html      # Intake dashboard with HTMX instant check-offs
-│       ├── login.html / register.html
-│       ├── profile_setup.html  # Daily routine anchors configuration
-│       ├── medication_list.html / medication_form.html / medication_confirm_delete.html
-│       ├── regimen_list.html / regimen_form.html / regimen_confirm_delete.html
-│       ├── caregiver_list.html / caregiver_form.html / caregiver_confirm_delete.html
-│       ├── partials/dose_card.html
-│       └── reports/adherence_report.html
-├── docker-compose.yml          # Local PostgreSQL 16 + Redis 7 stack
+├── core/                       # Django Project Configuration
+│   ├── settings.py             # Settings (CORS, CSRF, Celery, Database)
+│   ├── cors.py                 # Zero-dependency CORS middleware
+│   ├── urls.py                 # Master routing (mounts /api/ and admin)
+│   └── celery.py               # Celery application initialization
+├── medtrack/                   # Core Clinical Domain Application
+│   ├── models.py               # PatientProfile, Routine, Medication, Regimen, DoseEvent, Caregiver
+│   ├── api.py                  # REST API endpoints for React frontend
+│   ├── api_urls.py             # Route definitions for /api/*
+│   ├── tasks.py                # Celery periodic tasks with exponential backoff retries
+│   ├── tests.py                # Core unit & integration test suite (26 tests)
+│   ├── tests_concurrency.py    # Multi-threaded row locking stress tests (ThreadPoolExecutor)
+│   ├── tests_api.py            # REST API endpoint integration tests (8 tests)
+│   └── services/               # Clinical Domain Services
+│       ├── scheduling.py       # Routine anchor calculations & localized dose generator
+│       ├── inventory.py        # Atomic stock decrement & rolling 7-day burn rate forecasting
+│       ├── escalation.py       # 30-min Tier 1 & 60-min Tier 2 state machine
+│       ├── notifications.py    # SMS and Email alert dispatchers
+│       ├── acknowledgment.py   # TimestampSigner cryptographic token generator
+│       └── reports.py          # Adherence compliance scorecard and requisition generator
+├── frontend/                   # Modern React 19 + Vite 6 Application Root
+│   ├── package.json
+│   ├── vite.config.js          # Vite config with /api proxy to http://127.0.0.1:8000
+│   ├── public/
+│   │   ├── manifest.json       # Progressive Web App manifest
+│   │   └── sw.js               # Service Worker offline cache
+│   └── src/
+│       ├── api/client.js       # Centralized API client with CSRF token injection
+│       ├── context/AuthContext.jsx # Global user authentication state
+│       ├── hooks/useOnlineStatus.js # Live network connectivity detector
+│       ├── utils/
+│       │   ├── soundAlert.js   # Web Audio API synthetic dual-tone chime
+│       │   └── notifications.js # Browser Notification API wrapper
+│       ├── components/
+│       │   ├── layout/         # Header (with network pill), Sidebar, Layout (offline banner)
+│       │   ├── ui/             # StatusBadge, Modal, Toast
+│       │   └── dashboard/      # DoseCard, AdherenceGauge
+│       └── pages/
+│           ├── auth/           # LoginPage, RegisterPage
+│           ├── profile/        # ProfileSetupPage (Routine anchors: Breakfast, Lunch, Dinner, Bedtime)
+│           ├── dashboard/      # DashboardPage (Telemetry, Adherence Ring, Today's Doses)
+│           ├── medications/    # MedicationListPage, MedicationModal
+│           ├── regimens/       # RegimenListPage, RegimenModal
+│           ├── caregivers/     # CaregiverListPage, CaregiverModal
+│           ├── caregiver-portal/ # CaregiverPortalPage (Live Watchdog, SVG Trends, Audio/Push)
+│           ├── caregiver-ack/  # CaregiverAckPage (/caregiver/ack/:token frictionless response)
+│           └── reports/        # AdherenceReportPage, RequisitionManifestPage (Print/CSV/JSON)
+├── start.bat                   # 1-Click concurrent orchestrator (Django + React + Browser)
 ├── requirements.txt            # Python dependencies
 └── manage.py
 ```
@@ -73,104 +112,44 @@ django-project/
 ## 🚀 Quickstart Guide
 
 ### ⚡ One-Click Run (Windows)
-Double-click `start.bat` or run in terminal:
-```cmd
-start.bat
-```
-This automated launcher:
-1. Verifies/creates `.venv` and installs required packages.
-2. Lets you choose between **Fast Local Mode** (SQLite) or **Docker Stack** (Postgres + Redis + Celery).
-3. Automatically runs migrations and verifies demo seed data.
-4. Opens your default web browser to [http://127.0.0.1:8000/](http://127.0.0.1:8000/).
-
----
-
-### Manual Setup
-
-#### 1. Prerequisites
-- Python 3.10+ installed
-- *(Optional for full Docker stack)* Docker & Docker Compose
-
-#### 2. Virtual Environment Setup
+Double-click `start.bat` in the repository root, or execute in PowerShell:
 ```powershell
-# Windows PowerShell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+.\start.bat
 ```
 
-```bash
-# macOS / Linux
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-### 3. Database & Migrations
-The application automatically defaults to SQLite for immediate local development. To use PostgreSQL, start the container (`docker compose up -d`) and set `DATABASE_URL` in `.env`.
-
-Apply all database migrations:
-```bash
-python manage.py migrate
-```
-
-### 4. Seed Deterministic Sample Data
-Load sample patient routines, medications, regimens, caregivers, and scheduled doses:
-```bash
-python manage.py seed_db --flush
-```
-
-**Pre-seeded Demo Accounts:**
-| Username | Password | Profile | Routine Anchor |
-|---|---|---|---|
-| `patient1` | `medtrack123` | Ramesh Patel | IST (Asia/Kolkata) — Metformin, Lisinopril, Atorvastatin |
-| `patient2` | `medtrack123` | Sarah Johnson | EST (America/New_York) — Levothyroxine, Omeprazole |
+This automated orchestrator:
+1. Verifies/creates Python `.venv` and ensures dependencies from `requirements.txt`.
+2. Automatically runs database migrations and seeds initial demo patient accounts.
+3. Verifies frontend `node_modules` and runs `npm install` automatically if needed.
+4. Spawns the **Django API Server** on `http://127.0.0.1:8000/`.
+5. Spawns the **Vite React Dev Server** on `http://localhost:5173/`.
+6. Automatically opens your browser to [http://localhost:5173/](http://localhost:5173/).
 
 ---
 
-## 🖥️ Running the Application
+### 🔑 Demo Personas
 
-### Start Development Server
-```bash
-python manage.py runserver
-```
-Navigate to [http://127.0.0.1:8000/](http://127.0.0.1:8000/) to access the dashboard.
-
-### Run Celery Worker & Beat (Escalation Engine)
-In separate terminal tabs with `.venv` activated:
-```bash
-# Terminal 1: Celery Worker
-celery -A core worker -l info -P solo
-
-# Terminal 2: Celery Beat (Periodic 1-minute missed dose scanner)
-celery -A core beat -l info
-```
+| Role | Username | Password | Timezone | Description |
+|---|---|---|---|---|
+| **Patient 1** | `patient1` | `medtrack123` | `Asia/Kolkata` (IST) | Ramesh Patel — 4 active regimens, anchor routine configured |
+| **Patient 2** | `patient2` | `medtrack123` | `Asia/Kolkata` (IST) | Sunita Sharma — 3 active regimens, secondary caregiver escalation |
 
 ---
 
-## 🧪 Test Suite
+## 🧪 Verification & Test Suites
 
-Run the full automated test suite (covering models, scheduling, atomic inventory decrements, views, escalation engine, and clinical reporting):
-```bash
+The project features a comprehensive test suite across unit, integration, concurrency, and API domains:
+
+```powershell
+# 1. Run all core backend tests (26 tests):
 python manage.py test medtrack
-```
-*Current test result:* `14 tests passing, 0 errors, 0 failures`.
 
----
+# 2. Run multi-threaded concurrency race-condition stress tests:
+python manage.py test medtrack.tests_concurrency
 
-## 🩺 Clinical Workflow & State Machine
+# 3. Run REST API integration test suite:
+python manage.py test medtrack.tests_api
 
-```
-[ Scheduled Anchor ] ──> Scheduled (+0m)
-                               │
-            ┌──────────────────┴──────────────────┐
-            │                                     │
-            ▼ (Intake confirmed)                  ▼ (Unconfirmed >30m)
-     [ TAKEN / TAKEN_LATE ]                    [ MISSED ]
-            │                                     │
-    Atomic Inventory                              ├─> Tier 1 Alert (Primary Caregiver)
-     Stock Decrement                              │
-                                                  ▼ (Unresolved >60m)
-                                              [ TIER 2 ALERT ]
-                                              (Emergency Secondary Contact)
+# 4. Run frontend production build check:
+npm run build --prefix frontend
 ```
