@@ -1,10 +1,11 @@
 @echo off
-title Smart MedTrack - Running...
+title Smart MedTrack - Orchestrator
 color 0B
 
 echo =====================================================================
-echo                SMART MEDTRACK LAUNCHER
-echo      Automated Medication Adherence and Inventory System
+echo                SMART MEDTRACK FULL-STACK LAUNCHER
+echo      Automated Medication Adherence and Inventory Forecasting
+echo      Architecture: Django 5 (Backend/API) + React 19 / Vite (Frontend)
 echo =====================================================================
 echo.
 
@@ -22,14 +23,14 @@ if not exist .venv\Scripts\python.exe (
     )
 )
 
-:: Ensure pip and required dependencies are installed
+:: Ensure pip and required Python dependencies are installed
 .venv\Scripts\python.exe -c "import django" >nul 2>nul
 if errorlevel 1 (
     echo [*] Dependencies not found or incomplete. Installing from requirements.txt...
     .venv\Scripts\python.exe -m pip install --upgrade pip
     .venv\Scripts\python.exe -m pip install -r requirements.txt
     if errorlevel 1 (
-        echo [ERROR] Failed to install dependencies.
+        echo [ERROR] Failed to install Python dependencies.
         pause
         exit /b 1
     )
@@ -64,24 +65,43 @@ if errorlevel 1 (
     echo [OK] Database is already initialized with demo patient accounts.
 )
 
+:: 5. Check Node.js and frontend dependencies
+echo.
+echo [*] Checking React frontend dependencies...
+if not exist "frontend\node_modules" (
+    echo [*] Installing frontend packages (first time setup)...
+    call npm install --prefix frontend
+) else (
+    echo [OK] Frontend packages verified.
+)
+
 echo.
 echo =====================================================================
-echo   [OK] SYSTEM READY!
+echo   [OK] FULL-STACK SYSTEM INITIALIZED SUCCESSFULLY!
 echo.
 echo   Demo Login Accounts:
 echo     - Username: patient1    Password: medtrack123   (Ramesh Patel - IST)
-echo     - Username: patient2    Password: medtrack123   (Sarah Johnson - EST)
+echo     - Username: patient2    Password: medtrack123   (Sunita Sharma - IST)
 echo.
-echo   Web Application: http://127.0.0.1:8000/
-echo   Admin Panel:     http://127.0.0.1:8000/admin/
+echo   React Web Application: http://localhost:5173/
+echo   Django REST API:       http://127.0.0.1:8000/api/
+echo   Django Admin Panel:    http://127.0.0.1:8000/admin/
 echo =====================================================================
 echo.
-echo Starting Django Web Server on http://127.0.0.1:8000/ ...
-echo Press CTRL+C to stop the server at any time.
+echo Starting concurrent services:
+echo   [1] Django API Server on http://127.0.0.1:8000/
+echo   [2] Vite React Server on http://localhost:5173/
 echo.
 
-:: Automatically open default browser after 2 seconds
-start "" cmd /c "timeout /t 2 /nobreak >nul && start http://127.0.0.1:8000/"
+:: Launch Django server in a dedicated window
+start "Smart MedTrack - Django Backend" cmd /k "title Smart MedTrack - Django Backend && color 0A && cd /d %~dp0 && .venv\Scripts\python.exe manage.py runserver 127.0.0.1:8000"
 
-:: Start Django server
-.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8000
+:: Launch Vite React dev server in a dedicated window
+start "Smart MedTrack - React Frontend" cmd /k "title Smart MedTrack - React Frontend && color 0E && cd /d %~dp0\frontend && npm run dev"
+
+:: Automatically open default browser to React frontend after 3 seconds
+start "" cmd /c "timeout /t 3 /nobreak >nul && start http://localhost:5173/"
+
+echo [OK] Both servers are launching in separate windows.
+echo You can close this launcher window, or press any key to exit.
+pause >nul
