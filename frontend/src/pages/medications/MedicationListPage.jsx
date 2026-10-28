@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Pill, Plus, Edit2, Trash2, AlertTriangle, TrendingDown, Clock, Search } from 'lucide-react';
+import { Pill, Plus, Edit2, Trash2, AlertTriangle, TrendingDown, Clock, Search, PackagePlus } from 'lucide-react';
 import { api } from '../../api/client';
 import MedicationModal from './MedicationModal';
+import QuickRefillModal from '../../components/inventory/QuickRefillModal';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Toast from '../../components/ui/Toast';
 
@@ -10,6 +11,7 @@ export default function MedicationListPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingMed, setEditingMed] = useState(null);
+  const [refillMed, setRefillMed] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [toast, setToast] = useState(null);
 
@@ -38,6 +40,23 @@ export default function MedicationListPage() {
       setToast({ message: 'Medication created successfully', type: 'success' });
     }
     fetchMedications();
+  };
+
+  const handleQuickRefill = async (medId, units) => {
+    const med = medications.find((m) => m.id === medId);
+    if (!med) return;
+    try {
+      await api.updateMedication(medId, {
+        name: med.name,
+        stock_level: med.stock_level + units,
+        reorder_threshold: med.reorder_threshold,
+        unit: med.unit,
+      });
+      setToast({ message: `Refilled +${units} ${med.unit} for ${med.name}!`, type: 'success' });
+      fetchMedications();
+    } catch (err) {
+      setToast({ message: 'Refill failed: ' + err.message, type: 'error' });
+    }
   };
 
   const handleDelete = async (id, name) => {
@@ -189,24 +208,34 @@ export default function MedicationListPage() {
                 </div>
 
                 {/* Footer Controls */}
-                <div className="flex items-center justify-end gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
                   <button
-                    onClick={() => {
-                      setEditingMed(med);
-                      setModalOpen(true);
-                    }}
-                    className="p-2 rounded-xl text-slate-500 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-slate-800 transition-colors"
-                    title="Edit Medication"
+                    onClick={() => setRefillMed(med)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 text-xs font-semibold hover:bg-emerald-100 transition-colors"
                   >
-                    <Edit2 className="w-4 h-4" />
+                    <PackagePlus className="w-3.5 h-3.5" />
+                    Quick Refill
                   </button>
-                  <button
-                    onClick={() => handleDelete(med.id, med.name)}
-                    className="p-2 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 transition-colors"
-                    title="Delete Medication"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        setEditingMed(med);
+                        setModalOpen(true);
+                      }}
+                      className="p-2 rounded-xl text-slate-500 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-slate-800 transition-colors"
+                      title="Edit Medication"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(med.id, med.name)}
+                      className="p-2 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 transition-colors"
+                      title="Delete Medication"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -220,6 +249,14 @@ export default function MedicationListPage() {
         onClose={() => setModalOpen(false)}
         onSave={handleSave}
         medication={editingMed}
+      />
+
+      {/* Quick Refill Modal */}
+      <QuickRefillModal
+        isOpen={Boolean(refillMed)}
+        onClose={() => setRefillMed(null)}
+        medication={refillMed}
+        onRefill={handleQuickRefill}
       />
     </div>
   );
