@@ -19,8 +19,10 @@ export default function RegimenListPage() {
         api.getRegimens(),
         api.getMedications(),
       ]);
-      setRegimens(regData);
-      setMedications(medData);
+      const regs = Array.isArray(regData) ? regData : (regData?.regimens || []);
+      const meds = Array.isArray(medData) ? medData : (medData?.medications || []);
+      setRegimens(regs);
+      setMedications(meds);
     } catch (err) {
       setToast({ message: 'Failed to load regimens: ' + err.message, type: 'error' });
     } finally {

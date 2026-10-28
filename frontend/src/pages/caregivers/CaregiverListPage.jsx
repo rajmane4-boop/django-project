@@ -18,7 +18,8 @@ export default function CaregiverListPage() {
     try {
       setLoading(true);
       const data = await api.getCaregivers();
-      setCaregivers(data);
+      const list = Array.isArray(data) ? data : (data?.caregivers || []);
+      setCaregivers(list);
     } catch (err) {
       setToast({ message: 'Failed to load caregivers: ' + err.message, type: 'error' });
     } finally {

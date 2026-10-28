@@ -29,9 +29,9 @@ export default function ProfileSetupPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const updated = await api.updateProfile(profile);
-      setProfile(updated);
+      await api.updateProfile(profile);
       setToast({ message: 'Profile & Routine Anchors updated successfully!', type: 'success' });
+      fetchProfile();
     } catch (err) {
       setToast({ message: 'Failed to update routine: ' + err.message, type: 'error' });
     } finally {

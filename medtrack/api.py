@@ -446,20 +446,27 @@ def api_medications(request):
     elif request.method == 'POST':
         data = _parse_body(request)
         name = data.get('name')
-        dosage_unit = data.get('dosageUnit', 'TABLETS')
+        raw_unit = data.get('dosageUnit') or data.get('dosage_unit') or data.get('unit', 'TABLETS')
+        dosage_unit = raw_unit.upper() if isinstance(raw_unit, str) else 'TABLETS'
         if not name:
             return JsonResponse({'error': 'Medication name is required'}, status=400)
+
+        stock_val = data.get('currentStock') if 'currentStock' in data else data.get('stock_level', 0)
+        reorder_val = data.get('reorderThreshold') if 'reorderThreshold' in data else data.get('reorder_threshold', 7)
+        lead_val = data.get('leadTimeDays') if 'leadTimeDays' in data else data.get('lead_time_days', 3)
+        generic_val = data.get('genericName') or data.get('chemical_name', '')
+        active_val = data.get('isActive') if 'isActive' in data else data.get('is_active', True)
 
         med = Medication.objects.create(
             patient=profile,
             name=name,
-            generic_name=data.get('genericName', ''),
+            generic_name=generic_val,
             dosage_unit=dosage_unit,
-            current_stock=Decimal(str(data.get('currentStock', 0))),
-            reorder_threshold=int(data.get('reorderThreshold', 7)),
-            lead_time_days=int(data.get('leadTimeDays', 3)),
+            current_stock=Decimal(str(stock_val)),
+            reorder_threshold=int(reorder_val),
+            lead_time_days=int(lead_val),
             notes=data.get('notes', ''),
-            is_active=data.get('isActive', True),
+            is_active=active_val,
         )
         return JsonResponse({'success': True, 'id': med.id}, status=201)
 
@@ -491,20 +498,24 @@ def api_medication_detail(request, pk):
         data = _parse_body(request)
         if 'name' in data:
             med.name = data['name']
-        if 'genericName' in data:
-            med.generic_name = data['genericName']
-        if 'dosageUnit' in data:
-            med.dosage_unit = data['dosageUnit']
-        if 'currentStock' in data:
-            med.current_stock = Decimal(str(data['currentStock']))
-        if 'reorderThreshold' in data:
-            med.reorder_threshold = int(data['reorderThreshold'])
-        if 'leadTimeDays' in data:
-            med.lead_time_days = int(data['leadTimeDays'])
+        if 'genericName' in data or 'chemical_name' in data:
+            med.generic_name = data.get('genericName') or data.get('chemical_name', '')
+        if 'dosageUnit' in data or 'unit' in data:
+            u = data.get('dosageUnit') or data.get('unit')
+            med.dosage_unit = u.upper() if isinstance(u, str) else u
+        if 'currentStock' in data or 'stock_level' in data:
+            val = data.get('currentStock') if 'currentStock' in data else data.get('stock_level')
+            med.current_stock = Decimal(str(val))
+        if 'reorderThreshold' in data or 'reorder_threshold' in data:
+            val = data.get('reorderThreshold') if 'reorderThreshold' in data else data.get('reorder_threshold')
+            med.reorder_threshold = int(val)
+        if 'leadTimeDays' in data or 'lead_time_days' in data:
+            val = data.get('leadTimeDays') if 'leadTimeDays' in data else data.get('lead_time_days')
+            med.lead_time_days = int(val)
         if 'notes' in data:
             med.notes = data['notes']
-        if 'isActive' in data:
-            med.is_active = data['isActive']
+        if 'isActive' in data or 'is_active' in data:
+            med.is_active = data.get('isActive') if 'isActive' in data else data.get('is_active')
         med.save()
         return JsonResponse({'success': True, 'message': 'Medication updated'})
 
@@ -550,27 +561,34 @@ def api_regimens(request):
 
     elif request.method == 'POST':
         data = _parse_body(request)
-        med_id = data.get('medicationId')
+        med_id = data.get('medicationId') or data.get('medication_id')
         medication = get_object_or_404(Medication, pk=med_id, patient=profile)
 
+        fixed_time_str = data.get('fixedTime') or data.get('custom_time')
         fixed_time_val = None
-        if data.get('fixedTime'):
+        if fixed_time_str:
             try:
-                parts = [int(p) for p in data['fixedTime'].split(':')]
+                parts = [int(p) for p in fixed_time_str.split(':')]
                 fixed_time_val = time(parts[0], parts[1])
             except Exception:
                 pass
 
+        dose_val = data.get('doseQuantity') or data.get('dosage_units', 1)
+        offset_val = data.get('offsetMinutes') if 'offsetMinutes' in data else data.get('offset_minutes', 0)
+        freq_val = data.get('frequency', 'DAILY')
+        days_val = data.get('specificDays') or data.get('specific_days')
+        active_val = data.get('isActive') if 'isActive' in data else data.get('is_active', True)
+
         regimen = Regimen.objects.create(
             patient=profile,
             medication=medication,
-            dose_quantity=Decimal(str(data.get('doseQuantity', 1))),
+            dose_quantity=Decimal(str(dose_val)),
             anchor=data.get('anchor', 'BREAKFAST'),
-            offset_minutes=int(data.get('offsetMinutes', 0)),
+            offset_minutes=int(offset_val),
             fixed_time=fixed_time_val,
-            frequency=data.get('frequency', 'DAILY'),
-            specific_days=data.get('specificDays'),
-            is_active=data.get('isActive', True),
+            frequency=freq_val,
+            specific_days=days_val,
+            is_active=active_val,
         )
         return JsonResponse({'success': True, 'id': regimen.id}, status=201)
 
@@ -601,26 +619,30 @@ def api_regimen_detail(request, pk):
 
     elif request.method in ('PUT', 'POST'):
         data = _parse_body(request)
-        if 'medicationId' in data:
-            regimen.medication = get_object_or_404(Medication, pk=data['medicationId'], patient=profile)
-        if 'doseQuantity' in data:
-            regimen.dose_quantity = Decimal(str(data['doseQuantity']))
+        if 'medicationId' in data or 'medication_id' in data:
+            mid = data.get('medicationId') or data.get('medication_id')
+            regimen.medication = get_object_or_404(Medication, pk=mid, patient=profile)
+        if 'doseQuantity' in data or 'dosage_units' in data:
+            val = data.get('doseQuantity') or data.get('dosage_units')
+            regimen.dose_quantity = Decimal(str(val))
         if 'anchor' in data:
             regimen.anchor = data['anchor']
-        if 'offsetMinutes' in data:
-            regimen.offset_minutes = int(data['offsetMinutes'])
-        if 'fixedTime' in data:
-            if data['fixedTime']:
-                parts = [int(p) for p in data['fixedTime'].split(':')]
+        if 'offsetMinutes' in data or 'offset_minutes' in data:
+            val = data.get('offsetMinutes') if 'offsetMinutes' in data else data.get('offset_minutes')
+            regimen.offset_minutes = int(val)
+        if 'fixedTime' in data or 'custom_time' in data:
+            ft = data.get('fixedTime') or data.get('custom_time')
+            if ft:
+                parts = [int(p) for p in ft.split(':')]
                 regimen.fixed_time = time(parts[0], parts[1])
             else:
                 regimen.fixed_time = None
         if 'frequency' in data:
             regimen.frequency = data['frequency']
-        if 'specificDays' in data:
-            regimen.specific_days = data['specificDays']
-        if 'isActive' in data:
-            regimen.is_active = data['isActive']
+        if 'specificDays' in data or 'specific_days' in data:
+            regimen.specific_days = data.get('specificDays') or data.get('specific_days')
+        if 'isActive' in data or 'is_active' in data:
+            regimen.is_active = data.get('isActive') if 'isActive' in data else data.get('is_active')
         regimen.save()
         return JsonResponse({'success': True, 'message': 'Regimen updated'})
 
@@ -661,18 +683,22 @@ def api_caregivers(request):
     elif request.method == 'POST':
         data = _parse_body(request)
         name = data.get('name')
-        phone = data.get('phoneNumber')
+        phone = data.get('phoneNumber') or data.get('phone')
         if not name or not phone:
             return JsonResponse({'error': 'Name and phone number are required'}, status=400)
+
+        tier_val = data.get('priorityTier') if 'priorityTier' in data else data.get('tier', 1)
+        rel_val = data.get('relationship', 'OTHER')
+        active_val = data.get('isActive') if 'isActive' in data else data.get('is_active', True)
 
         caregiver = CaregiverContact.objects.create(
             patient=profile,
             name=name,
-            relationship=data.get('relationship', 'OTHER'),
+            relationship=rel_val,
             phone_number=phone,
             email=data.get('email', ''),
-            priority_tier=int(data.get('priorityTier', 1)),
-            is_active=data.get('isActive', True),
+            priority_tier=int(tier_val),
+            is_active=active_val,
         )
         return JsonResponse({'success': True, 'id': caregiver.id}, status=201)
 
@@ -704,14 +730,15 @@ def api_caregiver_detail(request, pk):
             contact.name = data['name']
         if 'relationship' in data:
             contact.relationship = data['relationship']
-        if 'phoneNumber' in data:
-            contact.phone_number = data['phoneNumber']
+        if 'phoneNumber' in data or 'phone' in data:
+            contact.phone_number = data.get('phoneNumber') or data.get('phone')
         if 'email' in data:
             contact.email = data['email']
-        if 'priorityTier' in data:
-            contact.priority_tier = int(data['priorityTier'])
-        if 'isActive' in data:
-            contact.is_active = data['isActive']
+        if 'priorityTier' in data or 'tier' in data:
+            val = data.get('priorityTier') if 'priorityTier' in data else data.get('tier')
+            contact.priority_tier = int(val)
+        if 'isActive' in data or 'is_active' in data:
+            contact.is_active = data.get('isActive') if 'isActive' in data else data.get('is_active')
         contact.save()
         return JsonResponse({'success': True, 'message': 'Caregiver updated'})
 

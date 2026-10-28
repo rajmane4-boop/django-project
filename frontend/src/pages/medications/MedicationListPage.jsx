@@ -19,7 +19,8 @@ export default function MedicationListPage() {
     try {
       setLoading(true);
       const data = await api.getMedications();
-      setMedications(data);
+      const list = Array.isArray(data) ? data : (data?.medications || []);
+      setMedications(list);
     } catch (err) {
       setToast({ message: 'Failed to load medications: ' + err.message, type: 'error' });
     } finally {
@@ -70,7 +71,7 @@ export default function MedicationListPage() {
     }
   };
 
-  const filteredMeds = medications.filter(
+  const filteredMeds = (Array.isArray(medications) ? medications : []).filter(
     (m) =>
       m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (m.chemical_name && m.chemical_name.toLowerCase().includes(searchTerm.toLowerCase()))
