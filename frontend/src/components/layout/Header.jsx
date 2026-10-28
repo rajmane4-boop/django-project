@@ -1,11 +1,13 @@
 import React from 'react';
-import { Menu, LogOut, User, ShieldCheck, Wifi, WifiOff } from 'lucide-react';
+import { Menu, LogOut, User, ShieldCheck, Wifi, WifiOff, Sun, Moon } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
 export default function Header({ onMenuClick }) {
   const { user, logout } = useAuth();
   const { isOnline, wasOffline } = useOnlineStatus();
+  const { theme, toggleTheme } = useTheme();
 
   const formattedDate = new Date().toLocaleDateString('en-US', {
     weekday: 'short',
@@ -62,6 +64,13 @@ export default function Header({ onMenuClick }) {
               </div>
             </div>
 
+            <button
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              className="p-2 rounded-xl text-slate-500 hover:text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
+            </button>
             <button
               onClick={logout}
               title="Sign Out"
