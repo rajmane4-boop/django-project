@@ -15,6 +15,7 @@ import { api } from '../../api/client';
 import DoseCard from '../../components/dashboard/DoseCard';
 import AdherenceGauge from '../../components/dashboard/AdherenceGauge';
 import AdherenceStreak from '../../components/dashboard/AdherenceStreak';
+import AdherenceTrendSummary from '../../components/dashboard/AdherenceTrendSummary';
 import DoseFilterBar from '../../components/dashboard/DoseFilterBar';
 import PrintableScheduleModal from '../../components/dashboard/PrintableScheduleModal';
 import Toast from '../../components/ui/Toast';
@@ -247,6 +248,9 @@ export default function DashboardPage() {
         </div>
 
       </div>
+
+      {/* Adherence Quality Assessment Widget */}
+      <AdherenceTrendSummary stats={stats} />
 
       {/* Dose Events Stream */}
       <div className="space-y-4">
