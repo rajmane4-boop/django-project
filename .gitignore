@@ -36,3 +36,8 @@ staticfiles/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
