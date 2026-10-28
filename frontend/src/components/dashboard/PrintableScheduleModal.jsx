@@ -101,3 +101,4 @@ export default function PrintableScheduleModal({ isOpen, onClose, doses = [], pa
     </Modal>
   );
 }
+

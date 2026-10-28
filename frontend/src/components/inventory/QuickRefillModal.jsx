@@ -90,3 +90,4 @@ export default function QuickRefillModal({ isOpen, onClose, medication, onRefill
     </Modal>
   );
 }
+

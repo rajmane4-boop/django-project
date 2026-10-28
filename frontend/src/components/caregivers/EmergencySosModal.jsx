@@ -89,3 +89,4 @@ export default function EmergencySosModal({ isOpen, onClose, caregivers = [] }) 
     </Modal>
   );
 }
+

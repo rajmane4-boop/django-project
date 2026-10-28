@@ -43,3 +43,4 @@ export default function DoseFilterBar({ filterStatus, onStatusChange, searchTerm
     </div>
   );
 }
+

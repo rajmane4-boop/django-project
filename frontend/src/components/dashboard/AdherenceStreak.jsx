@@ -46,3 +46,4 @@ export default function AdherenceStreak({ rate = 0, totalTaken = 0 }) {
     </div>
   );
 }
+

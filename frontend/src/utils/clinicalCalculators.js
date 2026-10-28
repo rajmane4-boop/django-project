@@ -40,3 +40,4 @@ export function formatDosageString(units, unitType = 'tablets', frequency = 'ONC
 
   return `${units} ${unitType} (${freqLabel})`;
 }
+
