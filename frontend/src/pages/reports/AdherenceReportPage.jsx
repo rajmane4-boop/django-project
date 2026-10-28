@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Printer, Calendar, CheckCircle2, AlertTriangle, ShieldCheck, User } from 'lucide-react';
+import { FileText, Printer, Calendar, CheckCircle2, AlertTriangle, ShieldCheck, User, FileSpreadsheet, FileCode } from 'lucide-react';
 import { api } from '../../api/client';
 import AdherenceGauge from '../../components/dashboard/AdherenceGauge';
 import Toast from '../../components/ui/Toast';
@@ -28,6 +28,87 @@ export default function AdherenceReportPage() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const exportToCSV = () => {
+    if (!report) {
+      setToast({ message: 'No report data to export', type: 'error' });
+      return;
+    }
+    const lines = [
+      '# SMART MEDTRACK CLINICAL ADHERENCE SCORECARD',
+      `Patient Name,${patient.name || 'N/A'}`,
+      `Username,${patient.username || 'N/A'}`,
+      `Timezone,${patient.timezone || 'UTC'}`,
+      `Primary Physician,${patient.primary_physician || 'N/A'}`,
+      `Audit Window,Last ${report.period_days || days} Days`,
+      `Export Timestamp,${new Date().toISOString()}`,
+      '',
+      '# OVERALL ADHERENCE SUMMARY',
+      'Metric,Value',
+      `Adherence Rate,${stats.adherence_rate || 0}%`,
+      `Total Scheduled Doses,${stats.total_scheduled || 0}`,
+      `Taken On-Time,${stats.taken_on_time || 0}`,
+      `Taken Late,${stats.taken_late || 0}`,
+      `Skipped,${stats.skipped || 0}`,
+      `Missed / Breached,${stats.missed || 0}`,
+      '',
+      '# MEDICATION BREAKDOWN',
+      'Medication Name,Total Scheduled,Taken,Skipped,Missed,Adherence Rate',
+      ...medBreakdown.map((m) =>
+        [
+          `"${(m.name || '').replace(/"/g, '""')}"`,
+          m.scheduled,
+          m.taken,
+          m.skipped,
+          m.missed,
+          `${m.rate}%`,
+        ].join(',')
+      ),
+    ];
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + encodeURIComponent(lines.join('\n'));
+    const link = document.createElement('a');
+    link.setAttribute('href', csvContent);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    link.setAttribute('download', `MedTrack_Adherence_Audit_${patient.username || 'patient'}_${days}d_${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setToast({ message: 'Clinical Adherence CSV exported successfully.', type: 'success' });
+  };
+
+  const exportToJSON = () => {
+    if (!report) {
+      setToast({ message: 'No report data to export', type: 'error' });
+      return;
+    }
+    const exportPayload = {
+      dossier_type: 'CLINICAL_ADHERENCE_AUDIT',
+      specification_version: '1.0',
+      exported_at: new Date().toISOString(),
+      audit_window_days: report.period_days || days,
+      patient: report.patient,
+      summary_statistics: report.stats,
+      medication_compliance: medBreakdown.map((m) => ({
+        name: m.name,
+        scheduled: m.scheduled,
+        taken: m.taken,
+        skipped: m.skipped,
+        missed: m.missed,
+        adherence_rate_pct: m.rate,
+      })),
+    };
+
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
+    const downloadAnchor = document.createElement('a');
+    const dateStr = new Date().toISOString().slice(0, 10);
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `MedTrack_Adherence_Audit_${patient.username || 'patient'}_${days}d_${dateStr}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.removeChild(downloadAnchor);
+    setToast({ message: 'Clinical Adherence JSON exported successfully.', type: 'success' });
   };
 
   if (loading) {
@@ -78,11 +159,29 @@ export default function AdherenceReportPage() {
           </select>
 
           <button
+            onClick={exportToCSV}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold shadow-xs transition-all"
+            title="Download CSV for clinical spreadsheets"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Export CSV</span>
+          </button>
+
+          <button
+            onClick={exportToJSON}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold shadow-xs transition-all"
+            title="Download JSON for EHR telemetry import"
+          >
+            <FileCode className="w-3.5 h-3.5 text-brand-600" />
+            <span>Export JSON</span>
+          </button>
+
+          <button
             onClick={handlePrint}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold shadow-md shadow-brand-600/30 transition-all"
           >
             <Printer className="w-4 h-4" />
-            Print to PDF
+            Print PDF
           </button>
         </div>
       </div>
