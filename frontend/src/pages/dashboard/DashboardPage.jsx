@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import DoseCard from '../../components/dashboard/DoseCard';
 import AdherenceGauge from '../../components/dashboard/AdherenceGauge';
+import DoseFilterBar from '../../components/dashboard/DoseFilterBar';
 import Toast from '../../components/ui/Toast';
 
 export default function DashboardPage() {
@@ -20,6 +21,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [toast, setToast] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const loadDashboard = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -47,7 +50,6 @@ export default function DashboardPage() {
         message: result.message || 'Dose recorded successfully! Stock decremented atomically.',
         type: 'success',
       });
-      // Refresh dashboard state
       loadDashboard(true);
     } catch (err) {
       setToast({ message: err.message || 'Failed to record dose', type: 'error' });
@@ -76,6 +78,21 @@ export default function DashboardPage() {
   const stats = data?.stats || {};
   const doses = data?.doses || [];
   const lowStock = data?.lowStockMeds || [];
+
+  const filteredDoses = doses.filter((d) => {
+    const matchesStatus =
+      statusFilter === 'ALL'
+        ? true
+        : statusFilter === 'SCHEDULED'
+        ? d.status === 'SCHEDULED' || d.status === 'REMINDED'
+        : statusFilter === 'TAKEN'
+        ? d.status === 'TAKEN' || d.status === 'TAKEN_LATE'
+        : d.status === statusFilter;
+    const matchesSearch =
+      !searchTerm ||
+      d.medication_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesStatus && matchesSearch;
+  });
 
   return (
     <div className="space-y-6">
@@ -219,29 +236,52 @@ export default function DashboardPage() {
             Prescription Schedule Timeline
           </h2>
           <span className="text-xs text-slate-500">
-            {doses.length} dose event{doses.length === 1 ? '' : 's'} registered
+            {filteredDoses.length} of {doses.length} dose event{doses.length === 1 ? '' : 's'}
           </span>
         </div>
 
-        {doses.length === 0 ? (
+        {doses.length > 0 && (
+          <DoseFilterBar
+            filterStatus={statusFilter}
+            onStatusChange={setStatusFilter}
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+          />
+        )}
+
+        {filteredDoses.length === 0 ? (
           <div className="p-12 text-center rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
             <Pill className="w-10 h-10 mx-auto text-slate-400 mb-2" />
             <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200">
-              No Doses Scheduled Today
+              {doses.length === 0 ? 'No Doses Scheduled Today' : 'No Doses Match Your Filter'}
             </h3>
             <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-              You don't have any pending medication intakes for today. Check your prescription regimens or add a new one.
+              {doses.length === 0
+                ? "You don't have any pending medication intakes for today. Check your prescription regimens or add a new one."
+                : 'Try adjusting your search query or status filter.'}
             </p>
-            <Link
-              to="/regimens"
-              className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold shadow-xs"
-            >
-              Manage Regimens
-            </Link>
+            {doses.length === 0 ? (
+              <Link
+                to="/regimens"
+                className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold shadow-xs"
+              >
+                Manage Regimens
+              </Link>
+            ) : (
+              <button
+                onClick={() => {
+                  setStatusFilter('ALL');
+                  setSearchTerm('');
+                }}
+                className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold"
+              >
+                Clear Filters
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3.5">
-            {doses.map((dose) => (
+            {filteredDoses.map((dose) => (
               <DoseCard
                 key={dose.id}
                 dose={dose}
