@@ -227,3 +227,4 @@ class RestApiIntegrationTestCase(TestCase):
         req_data = req_res.json()
         self.assertIn('items', req_data)
         self.assertIn('itemCount', req_data)
+
