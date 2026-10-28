@@ -8,6 +8,7 @@ import {
   ArrowRight,
   TrendingDown,
   Pill,
+  Printer,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
@@ -15,6 +16,7 @@ import DoseCard from '../../components/dashboard/DoseCard';
 import AdherenceGauge from '../../components/dashboard/AdherenceGauge';
 import AdherenceStreak from '../../components/dashboard/AdherenceStreak';
 import DoseFilterBar from '../../components/dashboard/DoseFilterBar';
+import PrintableScheduleModal from '../../components/dashboard/PrintableScheduleModal';
 import Toast from '../../components/ui/Toast';
 
 export default function DashboardPage() {
@@ -24,6 +26,7 @@ export default function DashboardPage() {
   const [toast, setToast] = useState(null);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [printModalOpen, setPrintModalOpen] = useState(false);
 
   const loadDashboard = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -116,14 +119,26 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => loadDashboard(true)}
-          disabled={refreshing}
-          className="flex items-center gap-2 self-start sm:self-auto px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 transition-all shadow-xs"
-        >
-          <RotateCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          {doses.length > 0 && (
+            <button
+              onClick={() => setPrintModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 transition-all shadow-xs"
+              title="Print Today's Schedule Slip"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print Slip</span>
+            </button>
+          )}
+          <button
+            onClick={() => loadDashboard(true)}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 transition-all shadow-xs"
+          >
+            <RotateCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Low Stock Alerts (Module 4) */}
@@ -296,6 +311,12 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      <PrintableScheduleModal
+        isOpen={printModalOpen}
+        onClose={() => setPrintModalOpen(false)}
+        doses={filteredDoses}
+      />
     </div>
   );
 }
