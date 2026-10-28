@@ -11,6 +11,9 @@ import {
   Check,
   X,
   Stethoscope,
+  TrendingUp,
+  BarChart2,
+  Activity,
 } from 'lucide-react';
 import { api } from '../../api/client';
 import StatusBadge from '../../components/ui/StatusBadge';
@@ -186,6 +189,89 @@ export default function CaregiverPortalPage() {
         </div>
       )}
 
+      {/* Visual Analytics & Adherence Comparison */}
+      {patients.length > 0 && (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400">
+                <BarChart2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                  Patient Cohort Adherence Analytics
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Real-time compliance benchmark across all monitored patients
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-xs font-semibold">
+              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> High (&ge;80%)
+              </span>
+              <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> Moderate (50-79%)
+              </span>
+              <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" /> At Risk (&lt;50%)
+              </span>
+            </div>
+          </div>
+
+          {/* Quick Metrics Bar */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Total Monitored</span>
+              <p className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">{patients.length}</p>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40">
+              <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">Optimal (&ge;80%)</span>
+              <p className="text-2xl font-black text-emerald-700 dark:text-emerald-300 mt-0.5">
+                {patients.filter((p) => (p.adherence_rate || 0) >= 80).length}
+              </p>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40">
+              <span className="text-[11px] font-medium text-amber-700 dark:text-amber-300">Needs Followup (&lt;80%)</span>
+              <p className="text-2xl font-black text-amber-700 dark:text-amber-300 mt-0.5">
+                {patients.filter((p) => (p.adherence_rate || 0) < 80).length}
+              </p>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/40">
+              <span className="text-[11px] font-medium text-rose-700 dark:text-rose-300">Active Escalations</span>
+              <p className="text-2xl font-black text-rose-700 dark:text-rose-300 mt-0.5">{urgentAlerts.length}</p>
+            </div>
+          </div>
+
+          {/* Comparative Horizontal Bar Chart */}
+          <div className="space-y-3 pt-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              Patient Compliance Visual Comparison
+            </h3>
+            <div className="space-y-2.5">
+              {patients.map((pat) => {
+                const rate = pat.adherence_rate || 0;
+                const barColor = rate >= 80 ? 'bg-emerald-500' : rate >= 50 ? 'bg-amber-500' : 'bg-rose-500';
+                return (
+                  <div key={'chart-' + pat.id} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{pat.name}</span>
+                      <span className="font-mono font-bold text-slate-600 dark:text-slate-400">{rate}%</span>
+                    </div>
+                    <div className="h-2.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full ${barColor} rounded-full transition-all duration-500`}
+                        style={{ width: `${Math.min(rate, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Monitored Patients Roster */}
       <div className="space-y-3">
         <h2 className="text-lg font-bold text-slate-900 dark:text-white">
@@ -232,6 +318,24 @@ export default function CaregiverPortalPage() {
                   <div>
                     <span className="text-slate-400 block text-[10px]">Missed</span>
                     <span className="font-bold text-rose-600 dark:text-rose-400">{pat.today_missed}</span>
+                  </div>
+                </div>
+
+                {/* Visual Today Intake Progress */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                    <span>Today Intake Progress</span>
+                    <span>
+                      {pat.today_total > 0 ? Math.round((pat.today_taken / pat.today_total) * 100) : 100}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-teal-500 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${pat.today_total > 0 ? Math.min(Math.round((pat.today_taken / pat.today_total) * 100), 100) : 100}%`,
+                      }}
+                    />
                   </div>
                 </div>
 
