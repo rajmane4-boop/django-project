@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Printer, AlertTriangle, CheckCircle2, Building2, Calendar, FileCheck } from 'lucide-react';
+import { ShoppingBag, Printer, AlertTriangle, CheckCircle2, Building2, Calendar, FileCheck, FileSpreadsheet, FileCode } from 'lucide-react';
 import { api } from '../../api/client';
 import Toast from '../../components/ui/Toast';
 
@@ -27,6 +27,89 @@ export default function RequisitionManifestPage() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const exportToCSV = () => {
+    if (!manifest || !items.length) {
+      setToast({ message: 'No items available to export', type: 'error' });
+      return;
+    }
+    const headers = [
+      'Medication Name',
+      'Unit',
+      'Current Stock',
+      'Next 7-Day Units',
+      'Daily Burn Rate',
+      'Days Remaining',
+      'Lead Time Days',
+      'Status',
+      'Recommended Order Quantity',
+    ];
+    const rows = items.map((item) => [
+      `"${item.medication.name.replace(/"/g, '""')}"`,
+      item.medication.dosage_unit,
+      item.medication.current_stock,
+      item.scheduled_next_7_days,
+      item.burn_rate_daily,
+      item.days_remaining === 9999 ? 'Inf' : item.days_remaining,
+      item.medication.lead_time_days,
+      item.is_low_stock ? 'REORDER REQUIRED' : 'SUFFICIENT',
+      item.recommended_order_quantity,
+    ]);
+
+    const csvContent =
+      'data:text/csv;charset=utf-8,' +
+      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    link.setAttribute('download', `MedTrack_Pharmacy_Requisition_${patient.username || 'patient'}_${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setToast({ message: 'Pharmacy Requisition CSV exported successfully.', type: 'success' });
+  };
+
+  const exportToJSON = () => {
+    if (!manifest) {
+      setToast({ message: 'No manifest available to export', type: 'error' });
+      return;
+    }
+    const exportPayload = {
+      manifest_type: 'PHARMACY_REFILL_REQUISITION',
+      version: '1.0',
+      exported_at: new Date().toISOString(),
+      patient: manifest.patient,
+      summary: {
+        total_medications: items.length,
+        reorder_required_count: lowCount,
+        filter_all_included: includeAll,
+      },
+      items: items.map((item) => ({
+        medication_id: item.medication.id,
+        name: item.medication.name,
+        dosage_unit: item.medication.dosage_unit,
+        current_stock: item.medication.current_stock,
+        scheduled_next_7_days: item.scheduled_next_7_days,
+        burn_rate_daily: item.burn_rate_daily,
+        days_remaining: item.days_remaining,
+        reorder_threshold: item.medication.reorder_threshold,
+        lead_time_days: item.medication.lead_time_days,
+        is_low_stock: item.is_low_stock,
+        recommended_order_quantity: item.recommended_order_quantity,
+      })),
+    };
+
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
+    const downloadAnchor = document.createElement('a');
+    const dateStr = new Date().toISOString().slice(0, 10);
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `MedTrack_Pharmacy_Requisition_${patient.username || 'patient'}_${dateStr}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.removeChild(downloadAnchor);
+    setToast({ message: 'Pharmacy Requisition JSON exported successfully.', type: 'success' });
   };
 
   if (loading) {
@@ -75,11 +158,29 @@ export default function RequisitionManifestPage() {
           </label>
 
           <button
+            onClick={exportToCSV}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold shadow-xs transition-all"
+            title="Download CSV for pharmacy EDI import"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Export CSV</span>
+          </button>
+
+          <button
+            onClick={exportToJSON}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold shadow-xs transition-all"
+            title="Download structured JSON manifest"
+          >
+            <FileCode className="w-3.5 h-3.5 text-brand-600" />
+            <span>Export JSON</span>
+          </button>
+
+          <button
             onClick={handlePrint}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold shadow-md shadow-brand-600/30 transition-all"
           >
             <Printer className="w-4 h-4" />
-            Print Purchase Order
+            Print Order
           </button>
         </div>
       </div>
