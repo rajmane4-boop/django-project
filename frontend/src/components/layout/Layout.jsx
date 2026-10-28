@@ -1,13 +1,47 @@
-import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { WifiOff } from 'lucide-react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { useTheme } from '../../context/ThemeContext';
+import KeyboardShortcutsModal from '../ui/KeyboardShortcutsModal';
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const { isOnline } = useOnlineStatus();
+  const { toggleTheme } = useTheme();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Don't trigger hotkeys if user is typing inside an input/textarea/select
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) {
+        return;
+      }
+
+      if (e.key === '?') {
+        e.preventDefault();
+        setShortcutsOpen((prev) => !prev);
+      } else if (e.key === 'd') {
+        navigate('/');
+      } else if (e.key === 'm') {
+        navigate('/medications');
+      } else if (e.key === 'r') {
+        navigate('/regimens');
+      } else if (e.key === 'c') {
+        navigate('/caregivers');
+      } else if (e.key === 'p') {
+        navigate('/caregiver/portal');
+      } else if (e.key === 't') {
+        toggleTheme();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [navigate, toggleTheme]);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col">
@@ -34,6 +68,11 @@ export default function Layout() {
           </main>
         </div>
       </div>
+
+      <KeyboardShortcutsModal
+        isOpen={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+      />
     </div>
   );
 }
