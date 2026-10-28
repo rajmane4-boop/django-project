@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import DoseCard from '../../components/dashboard/DoseCard';
 import AdherenceGauge from '../../components/dashboard/AdherenceGauge';
+import AdherenceStreak from '../../components/dashboard/AdherenceStreak';
 import DoseFilterBar from '../../components/dashboard/DoseFilterBar';
 import Toast from '../../components/ui/Toast';
 
@@ -161,6 +162,9 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Clinical Adherence Streak & Gamification */}
+      <AdherenceStreak rate={stats.adherence_rate || 0} totalTaken={stats.taken_today || 0} />
 
       {/* Telemetry Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
