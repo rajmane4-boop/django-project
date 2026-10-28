@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Plus, Edit2, Trash2, Phone, Mail, ShieldAlert } from 'lucide-react';
 import { api } from '../../api/client';
 import CaregiverModal from './CaregiverModal';
+import EmergencySosModal from '../../components/caregivers/EmergencySosModal';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Toast from '../../components/ui/Toast';
 
@@ -11,6 +12,7 @@ export default function CaregiverListPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCaregiver, setEditingCaregiver] = useState(null);
   const [toast, setToast] = useState(null);
+  const [sosOpen, setSosOpen] = useState(false);
 
   const fetchCaregivers = async () => {
     try {
@@ -70,16 +72,28 @@ export default function CaregiverListPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            setEditingCaregiver(null);
-            setModalOpen(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold shadow-md shadow-brand-600/30 transition-all self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          Add Caregiver
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          {caregivers.length > 0 && (
+            <button
+              onClick={() => setSosOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 text-xs font-bold transition-all shadow-xs"
+            >
+              <ShieldAlert className="w-4 h-4 text-rose-600 animate-pulse" />
+              Emergency SOS
+            </button>
+          )}
+
+          <button
+            onClick={() => {
+              setEditingCaregiver(null);
+              setModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold shadow-md shadow-brand-600/30 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            Add Caregiver
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -167,6 +181,13 @@ export default function CaregiverListPage() {
         onClose={() => setModalOpen(false)}
         onSave={handleSave}
         caregiver={editingCaregiver}
+      />
+
+      {/* Emergency SOS Modal */}
+      <EmergencySosModal
+        isOpen={sosOpen}
+        onClose={() => setSosOpen(false)}
+        caregivers={caregivers}
       />
     </div>
   );
